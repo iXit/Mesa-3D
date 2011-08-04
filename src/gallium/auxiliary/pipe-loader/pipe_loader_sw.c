@@ -29,8 +29,11 @@
 
 #include "util/u_memory.h"
 #include "util/u_dl.h"
+#ifdef HAVE_PIPE_LOADER_DRI
 #include "sw/dri/dri_sw_winsys.h"
+#endif
 #include "sw/null/null_sw_winsys.h"
+#include "sw/wrapper/wrapper_sw_winsys.h"
 #ifdef HAVE_PIPE_LOADER_XLIB
 /* Explicitly wrap the header to ease build without X11 headers */
 #include "sw/xlib/xlib_sw_winsys.h"
@@ -138,6 +141,25 @@ pipe_loader_sw_probe(struct pipe_loader_device **devs, int ndev)
    }
 
    return i;
+}
+
+boolean
+pipe_loader_sw_probe_wrapped(struct pipe_loader_device **dev,
+                             struct pipe_screen *screen)
+{
+   struct pipe_loader_sw_device *sdev = CALLOC_STRUCT(pipe_loader_sw_device);
+
+   sdev->base.type = PIPE_LOADER_DEVICE_SOFTWARE;
+   sdev->base.driver_name = "swrast";
+   sdev->base.ops = &pipe_loader_sw_ops;
+   sdev->ws = wrapper_sw_winsys_wrap_pipe_screen(screen);
+
+   if (!sdev->ws) {
+      FREE(sdev);
+      return FALSE;
+   }
+   *dev = &sdev->base;
+   return TRUE;
 }
 
 static void

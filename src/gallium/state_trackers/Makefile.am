@@ -64,3 +64,7 @@ endif
 if HAVE_ST_OMX
 SUBDIRS += omx
 endif
+
+if HAVE_ST_NINE
+SUBDIRS += nine
+endif

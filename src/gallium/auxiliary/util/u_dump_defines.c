@@ -61,6 +61,28 @@ util_dump_enum_continuous(unsigned value,
    return names[value];
 }
 
+static const char *
+util_dump_flags(unsigned flags, const char *prefix,
+                unsigned num_names,
+                const char **names)
+{
+   static __thread char str[256];
+   int i, pos;
+
+   if (!flags)
+      return "";
+   pos = snprintf(str, Elements(str), "%s_", prefix);
+
+   for (i = 0; (i < num_names) && flags; flags >>= 1, ++i) {
+      if (flags & 1) {
+         pos += snprintf(&str[pos], Elements(str) - pos, "%s", names[i]);
+         if (flags & ~1)
+            pos += snprintf(&str[pos], Elements(str) - pos, "|");
+      }
+   }
+   return str;
+}
+
 
 #define DEFINE_UTIL_DUMP_CONTINUOUS(_name) \
    const char * \
@@ -87,6 +109,14 @@ util_dump_enum_continuous(unsigned value,
          return util_dump_enum_continuous(value, Elements(util_dump_##_name##_short_names), util_dump_##_name##_short_names); \
       else \
          return util_dump_enum_continuous(value, Elements(util_dump_##_name##_names), util_dump_##_name##_names); \
+   }
+
+
+#define DEFINE_UTIL_DUMP_FLAGS(_prefix, _name)   \
+   const char * \
+   util_dump_##_name##_flags(unsigned flags) \
+   { \
+      return util_dump_flags(flags, _prefix, Elements(util_dump_##_name##_flag_names), util_dump_##_name##_flag_names); \
    }
 
 
@@ -392,3 +422,51 @@ util_dump_query_type_short_names[] = {
 };
 
 DEFINE_UTIL_DUMP_CONTINUOUS(query_type)
+
+
+static const char *
+util_dump_bind_flag_names[] = {
+   "DEPTH_STENCIL",
+   "RENDER_TARGET",
+   "BLENDABLE",
+   "SAMPLER_VIEW",
+   "VERTEX_BUFFER",
+   "INDEX_BUFFER",
+   "CONSTANT_BUFFER",
+   "(7)",
+   "DISPLAY_TARGET",
+   "TRANSFER_WRITE",
+   "TRANSFER_READ",
+   "STREAM_OUTPUT",
+   "(12)",
+   "(13)",
+   "(14)",
+   "(15)",
+   "CURSOR",
+   "CUSTOM",
+   "GLOBAL",
+   "SHADER_RESOURCE",
+   "COMPUTE_RESOURCE"
+};
+
+DEFINE_UTIL_DUMP_FLAGS("PIPE_BIND", bind)
+
+
+static const char *
+util_dump_transfer_flag_names[] = {
+   "READ",
+   "WRITE",
+   "MAP_DIRECTLY",
+   "(3)",
+   "(4)",
+   "(5)",
+   "(6)",
+   "(7)",
+   "DISCARD_RANGE",
+   "DONTBLOCK",
+   "UNSYNCHRONIZED",
+   "FLUSH_EXPLICIT",
+   "DISCARD_WHOLE_RESOURCE"
+};
+
+DEFINE_UTIL_DUMP_FLAGS("", transfer)

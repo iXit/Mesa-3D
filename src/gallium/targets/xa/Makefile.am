@@ -39,6 +39,11 @@ libxatracker_la_LIBADD = \
 	$(LIBDRM_LIBS) \
 	$(GALLIUM_COMMON_LIB_DEPS)
 
+if NEED_WINSYS_WRAPPER
+libxatracker_la_LIBADD += \
+	$(top_builddir)/src/gallium/winsys/sw/wrapper/libwsw.la
+endif
+
 libxatracker_la_LDFLAGS = \
 	-no-undefined \
 	-version-number $(XA_MAJOR):$(XA_MINOR):$(XA_TINY) \

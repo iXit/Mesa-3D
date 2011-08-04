@@ -37,6 +37,11 @@ gbm_gallium_drm_la_LIBADD = \
 	$(LIBDRM_LIBS) \
 	$(GALLIUM_COMMON_LIB_DEPS)
 
+if NEED_WINSYS_WRAPPER
+gbm_gallium_drm_la_LIBADD += \
+	$(top_builddir)/src/gallium/winsys/sw/wrapper/libwsw.la
+endif
+
 gbm_gallium_drm_la_LDFLAGS = \
 	-module \
 	-no-undefined \

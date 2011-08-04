@@ -371,10 +371,10 @@ void draw_set_viewport_states( struct draw_context *draw,
        viewport->translate[2] == 0.0f &&
        viewport->translate[3] == 0.0f);
 
-   draw->driver.bypass_clip_xy = vps[0]->scale[3] == 0.0f;
+   draw->driver.bypass_clip_xy = vps[0].scale[3] == 0.0f;
    draw->clip_xy = !draw->driver.bypass_clip_xy;
    draw->identity_viewport =
-      draw->identity_viewport || vpt[0]->scale[3] == 0.0f;
+      draw->identity_viewport || vps[0].scale[3] == 0.0f;
 }
 
 

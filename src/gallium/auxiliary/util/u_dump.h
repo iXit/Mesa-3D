@@ -88,6 +88,12 @@ util_dump_tex_filter(unsigned value, boolean shortened);
 const char *
 util_dump_query_type(unsigned value, boolean shortened);
 
+const char *
+util_dump_bind_flags(unsigned flags);
+
+const char *
+util_dump_transfer_flags(unsigned flags);
+
 
 /*
  * p_state.h, through a FILE

@@ -657,6 +657,11 @@ AC_ARG_ENABLE([gbm],
          [enable gbm library @<:@default=auto@:>@])],
    [enable_gbm="$enableval"],
    [enable_gbm=auto])
+AC_ARG_ENABLE([nine],
+    [AS_HELP_STRING([--enable-nine],
+        [enable build of the nine Direct3D9 API @<:@default=no@:>@])],
+    [enable_nine="$enableval"],
+    [enable_nine=no])
 
 AC_ARG_ENABLE([xvmc],
    [AS_HELP_STRING([--enable-xvmc],
@@ -729,6 +734,12 @@ AC_ARG_WITH([gallium-drivers],
     [with_gallium_drivers="$withval"],
     [with_gallium_drivers="$GALLIUM_DRIVERS_DEFAULT"])
 
+AC_ARG_WITH([gallium-driver-dir],
+    [AS_HELP_STRING([--with-gallium-driver-dir=DIR],
+        [directory for the Gallium pipe drivers @<:@${libdir}/gallium-pipe@:>@])],
+    [GALLIUM_PIPE_LOADER_DIR="$withval"],
+    [GALLIUM_PIPE_LOADER_DIR='${libdir}/gallium-pipe'])
+
 # Doing '--without-gallium-drivers' will set this variable to 'no'.  Clear it
 # here so that the script doesn't choke on an unknown driver name later.
 case "$with_gallium_drivers" in
@@ -739,6 +750,7 @@ esac
 if test "x$enable_opengl" = xno -a \
         "x$enable_gles1" = xno -a \
         "x$enable_gles2" = xno -a \
+        "x$enable_nine" = xno -a \
         "x$enable_openvg" = xno -a \
         "x$enable_xa" = xno -a \
         "x$enable_xvmc" = xno -a \
@@ -1362,6 +1374,22 @@ fi
 AM_CONDITIONAL(HAVE_GALLIUM_GBM, test "x$enable_gallium_gbm" = xyes)
 
 dnl
+dnl Nine Direct3D9 configuration
+dnl
+if test "x$enable_nine" = xyes; then
+    if test "x$with_gallium_drivers" = x; then
+        AC_MSG_ERROR([cannot enable nine without Gallium])
+    fi
+
+    GALLIUM_STATE_TRACKERS_DIRS="$GALLIUM_STATE_TRACKERS_DIRS nine"
+    GALLIUM_TARGET_DIRS="$GALLIUM_TARGET_DIRS d3dadapter9"
+
+    dnl d3dadapter9 requires pipe-loader
+    enable_gallium_loader=yes
+fi
+AM_CONDITIONAL(HAVE_ST_NINE, test "x$enable_nine" = xyes)
+
+dnl
 dnl XA configuration
 dnl
 if test "x$enable_xa" = xyes; then
@@ -1909,7 +1937,8 @@ radeon_llvm_check() {
 
 dnl Gallium drivers
 if test "x$enable_dri" = xyes -o "x$enable_xa" = xyes -o \
-        "x$enable_xvmc" = xyes -o "x$enable_vdpau" = xyes; then
+        "x$enable_xvmc" = xyes -o "x$enable_vdpau" = xyes -o \
+        "x$enable_nine" = xyes; then
     NEED_NONNULL_WINSYS=yes
 fi
 AM_CONDITIONAL(NEED_NONNULL_WINSYS, test "x$NEED_NONNULL_WINSYS" = xyes)
@@ -2062,7 +2091,8 @@ AM_CONDITIONAL(HAVE_GALLIUM_SOFTPIPE, test "x$HAVE_GALLIUM_SOFTPIPE" = xyes)
 AM_CONDITIONAL(HAVE_GALLIUM_LLVMPIPE, test "x$HAVE_GALLIUM_LLVMPIPE" = xyes)
 
 AM_CONDITIONAL(NEED_GALLIUM_SOFTPIPE_DRIVER, test "x$HAVE_GALLIUM_SVGA" = xyes -o \
-                                                  "x$HAVE_GALLIUM_SOFTPIPE" = xyes)
+                                                  "x$HAVE_GALLIUM_SOFTPIPE" = xyes -o \
+                                                  "x$enable_nine$enable_gallium_llvm" = xyesno)
 AM_CONDITIONAL(NEED_GALLIUM_LLVMPIPE_DRIVER, test "x$HAVE_GALLIUM_SOFTPIPE" = xyes \
                                                   && test "x$MESA_LLVM" = x1)
 
@@ -2076,7 +2106,8 @@ AM_CONDITIONAL(HAVE_GALLIUM_STATIC_TARGETS, test "xyes" = xyes)
 #       use by XA tracker in particular, but could be used in any case
 #       where communication with xserver is not desired).
 if test "x$enable_gallium_loader" = xyes; then
-    GALLIUM_WINSYS_DIRS="$GALLIUM_WINSYS_DIRS sw/null"
+    GALLIUM_WINSYS_DIRS="$GALLIUM_WINSYS_DIRS sw/null sw/wrapper"
+    GALLIUM_PIPE_LOADER_LIBS="$DLOPEN_LIBS"
 
     if test "x$NEED_WINSYS_XLIB" = xyes; then
         GALLIUM_PIPE_LOADER_DEFINES="$GALLIUM_PIPE_LOADER_DEFINES -DHAVE_PIPE_LOADER_XLIB"
@@ -2101,6 +2132,7 @@ if test "x$enable_gallium_loader" = xyes; then
 
     AC_SUBST([GALLIUM_PIPE_LOADER_DEFINES])
     AC_SUBST([GALLIUM_PIPE_LOADER_LIBS])
+    AC_SUBST([GALLIUM_PIPE_LOADER_DIR])
     AC_SUBST([GALLIUM_PIPE_LOADER_CLIENT_DEFINES])
     AC_SUBST([GALLIUM_PIPE_LOADER_CLIENT_LIBS])
 fi
@@ -2117,7 +2149,8 @@ AM_CONDITIONAL(NEED_RADEON_DRM_WINSYS, test "x$NEED_NONNULL_WINSYS" = xyes -a \
                                             "x$HAVE_GALLIUM_R600" = xyes -o \
                                             "x$HAVE_GALLIUM_RADEONSI" = xyes)
 AM_CONDITIONAL(NEED_WINSYS_WRAPPER, test "x$HAVE_GALLIUM_I915" = xyes -o \
-                                         "x$HAVE_GALLIUM_SVGA" = xyes)
+                                         "x$HAVE_GALLIUM_SVGA" = xyes -o \
+                                         "x$enable_nine" = xyes)
 AM_CONDITIONAL(NEED_WINSYS_XLIB, test "x$NEED_WINSYS_XLIB" = xyes)
 AM_CONDITIONAL(NEED_RADEON_LLVM, test x$NEED_RADEON_LLVM = xyes)
 AM_CONDITIONAL(USE_R600_LLVM_COMPILER, test x$USE_R600_LLVM_COMPILER = xyes)
@@ -2203,6 +2236,7 @@ AC_CONFIG_FILES([Makefile
 		src/gallium/state_trackers/egl/Makefile
 		src/gallium/state_trackers/gbm/Makefile
 		src/gallium/state_trackers/glx/xlib/Makefile
+		src/gallium/state_trackers/nine/Makefile
 		src/gallium/state_trackers/omx/Makefile
 		src/gallium/state_trackers/osmesa/Makefile
 		src/gallium/state_trackers/vdpau/Makefile
@@ -2210,6 +2244,7 @@ AC_CONFIG_FILES([Makefile
 		src/gallium/state_trackers/xa/Makefile
 		src/gallium/state_trackers/xvmc/Makefile
 		src/gallium/targets/Makefile
+		src/gallium/targets/d3dadapter9/Makefile
 		src/gallium/targets/dri/Makefile
 		src/gallium/targets/egl-static/Makefile
 		src/gallium/targets/gbm/Makefile

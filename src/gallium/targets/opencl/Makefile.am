@@ -38,6 +38,11 @@ lib@OPENCL_LIBNAME@_la_LIBADD = \
 	-lclangBasic \
 	$(LLVM_LIBS)
 
+if NEED_WINSYS_WRAPPER
+lib@OPENCL_LIBNAME@_la_LIBADD += \
+	$(top_builddir)/src/gallium/winsys/sw/wrapper/libwsw.la
+endif
+
 nodist_EXTRA_lib@OPENCL_LIBNAME@_la_SOURCES = dummy.cpp
 lib@OPENCL_LIBNAME@_la_SOURCES =
 

@@ -18,6 +18,11 @@ LDADD = \
 	$(GALLIUM_PIPE_LOADER_CLIENT_LIBS) \
 	$(GALLIUM_COMMON_LIB_DEPS)
 
+if NEED_WINSYS_WRAPPER
+LDADD += \
+	$(top_builddir)/src/gallium/winsys/sw/wrapper/libwsw.la
+endif
+
 noinst_PROGRAMS = compute tri quad-tex
 
 compute_SOURCES = compute.c

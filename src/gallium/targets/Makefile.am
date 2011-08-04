@@ -69,3 +69,7 @@ endif
 if HAVE_GALLIUM_EGL
 SUBDIRS += egl-static
 endif
+
+if HAVE_ST_NINE
+SUBDIRS += d3dadapter9
+endif

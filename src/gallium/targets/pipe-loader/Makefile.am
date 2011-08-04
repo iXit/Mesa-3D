@@ -33,7 +33,7 @@ AM_CPPFLAGS = \
 	-DGALLIUM_TRACE \
 	-DGALLIUM_GALAHAD
 
-pipedir = $(libdir)/gallium-pipe
+pipedir = $(GALLIUM_PIPE_LOADER_DIR)
 pipe_LTLIBRARIES =
 
 PIPE_LIBS = \

@@ -24,12 +24,12 @@
 #define PIPE_ATOMIC_MSVC_INTRINSIC
 #elif (defined(PIPE_CC_MSVC) && defined(PIPE_ARCH_X86))
 #define PIPE_ATOMIC_ASM_MSVC_X86                
+#elif (defined(PIPE_CC_GCC) && (PIPE_CC_GCC_VERSION >= 401))
+#define PIPE_ATOMIC_GCC_INTRINSIC
 #elif (defined(PIPE_CC_GCC) && defined(PIPE_ARCH_X86))
 #define PIPE_ATOMIC_ASM_GCC_X86
 #elif (defined(PIPE_CC_GCC) && defined(PIPE_ARCH_X86_64))
 #define PIPE_ATOMIC_ASM_GCC_X86_64
-#elif defined(PIPE_CC_GCC) && (PIPE_CC_GCC_VERSION >= 401)
-#define PIPE_ATOMIC_GCC_INTRINSIC
 #else
 #error "Unsupported platform"
 #endif
@@ -154,10 +154,22 @@ p_atomic_inc(int32_t *v)
    (void) __sync_add_and_fetch(v, 1);
 }
 
+static INLINE int32_t
+p_atomic_inc_return(int32_t *v)
+{
+   return __sync_add_and_fetch(v, 1);
+}
+
 static INLINE void
 p_atomic_dec(int32_t *v)
 {
    (void) __sync_sub_and_fetch(v, 1);
+}
+
+static INLINE int32_t
+p_atomic_dec_return(int32_t *v)
+{
+   return __sync_sub_and_fetch(v, 1);
 }
 
 static INLINE int32_t
@@ -186,6 +198,8 @@ p_atomic_cmpxchg(int32_t *v, int32_t old, int32_t _new)
 #define p_atomic_dec_zero(_v) ((boolean) --(*(_v)))
 #define p_atomic_inc(_v) ((void) (*(_v))++)
 #define p_atomic_dec(_v) ((void) (*(_v))--)
+#define p_atomic_inc_return(_v) ((*(_v))++)
+#define p_atomic_dec_return(_v) ((*(_v))--)
 #define p_atomic_cmpxchg(_v, old, _new) (*(_v) == old ? *(_v) = (_new) : *(_v))
 
 #endif
@@ -288,10 +302,22 @@ p_atomic_inc(int32_t *v)
    _InterlockedIncrement((long *)v);
 }
 
+static INLINE int32_t
+p_atomic_inc_return(int32_t *v)
+{
+   return _InterlockedIncrement((long *)v);
+}
+
 static INLINE void
 p_atomic_dec(int32_t *v)
 {
    _InterlockedDecrement((long *)v);
+}
+
+static INLINE int32_t
+p_atomic_dec_return(int32_t *v)
+{
+   return _InterlockedDecrement((long *)v);
 }
 
 static INLINE int32_t

@@ -657,6 +657,11 @@ AC_ARG_ENABLE([gbm],
          [enable gbm library @<:@default=auto@:>@])],
    [enable_gbm="$enableval"],
    [enable_gbm=auto])
+AC_ARG_ENABLE([nine],
+    [AS_HELP_STRING([--enable-nine],
+        [enable build of the nine Direct3D9 API @<:@default=no@:>@])],
+    [enable_nine="$enableval"],
+    [enable_nine=no])
 
 AC_ARG_ENABLE([xvmc],
    [AS_HELP_STRING([--enable-xvmc],
@@ -750,6 +755,7 @@ esac
 if test "x$enable_opengl" = xno -a \
         "x$enable_gles1" = xno -a \
         "x$enable_gles2" = xno -a \
+        "x$enable_nine" = xno -a \
         "x$enable_openvg" = xno -a \
         "x$enable_xa" = xno -a \
         "x$enable_xvmc" = xno -a \
@@ -1507,6 +1513,22 @@ AM_CONDITIONAL(HAVE_CLOVER_ICD, test "x$enable_opencl_icd" = xyes)
 AC_SUBST([OPENCL_LIBNAME])
 
 dnl
+dnl Nine Direct3D9 configuration
+dnl
+if test "x$enable_nine" = xyes; then
+    if test "x$with_gallium_drivers" = x; then
+        AC_MSG_ERROR([cannot enable nine without Gallium])
+    fi
+
+    GALLIUM_STATE_TRACKERS_DIRS="$GALLIUM_STATE_TRACKERS_DIRS nine"
+    GALLIUM_TARGET_DIRS="$GALLIUM_TARGET_DIRS d3dadapter9"
+
+    # XXX: Use $enable_shared_pipe_drivers once converted to use static/shared pipe-drivers
+    enable_gallium_loader=yes
+fi
+AM_CONDITIONAL(HAVE_ST_NINE, test "x$enable_nine" = xyes)
+
+dnl
 dnl Gallium configuration
 dnl
 AM_CONDITIONAL(HAVE_GALLIUM, test -n "$with_gallium_drivers")
@@ -2021,7 +2043,8 @@ AM_CONDITIONAL(HAVE_GALLIUM_RADEON_COMMON, test "x$HAVE_GALLIUM_R600" = xyes -o 
                                                 "x$HAVE_GALLIUM_RADEONSI" = xyes)
 AM_CONDITIONAL(HAVE_GALLIUM_NOUVEAU, test "x$HAVE_GALLIUM_NOUVEAU" = xyes)
 AM_CONDITIONAL(HAVE_GALLIUM_FREEDRENO, test "x$HAVE_GALLIUM_FREEDRENO" = xyes)
-AM_CONDITIONAL(HAVE_GALLIUM_SOFTPIPE, test "x$HAVE_GALLIUM_SOFTPIPE" = xyes)
+AM_CONDITIONAL(HAVE_GALLIUM_SOFTPIPE, test "x$HAVE_GALLIUM_SOFTPIPE" = xyes -o \
+                                           "x$enable_nine$enable_gallium_llvm" = xyesno)
 AM_CONDITIONAL(HAVE_GALLIUM_LLVMPIPE, test "x$HAVE_GALLIUM_LLVMPIPE" = xyes)
 AM_CONDITIONAL(HAVE_GALLIUM_VC4, test "x$HAVE_GALLIUM_VC4" = xyes)
 
@@ -2033,6 +2056,8 @@ AM_CONDITIONAL(HAVE_GALLIUM_STATIC_TARGETS, test "x$enable_shared_pipe_drivers" 
 #       use by XA tracker in particular, but could be used in any case
 #       where communication with xserver is not desired).
 if test "x$enable_gallium_loader" = xyes; then
+    GALLIUM_PIPE_LOADER_LIBS="$DLOPEN_LIBS"
+
     if test "x$NEED_WINSYS_XLIB" = xyes; then
         GALLIUM_PIPE_LOADER_DEFINES="$GALLIUM_PIPE_LOADER_DEFINES -DHAVE_PIPE_LOADER_XLIB"
     fi
@@ -2166,6 +2191,7 @@ AC_CONFIG_FILES([Makefile
 		src/gallium/state_trackers/egl/Makefile
 		src/gallium/state_trackers/gbm/Makefile
 		src/gallium/state_trackers/glx/xlib/Makefile
+		src/gallium/state_trackers/nine/Makefile
 		src/gallium/state_trackers/omx/Makefile
 		src/gallium/state_trackers/osmesa/Makefile
 		src/gallium/state_trackers/va/Makefile
@@ -2173,6 +2199,7 @@ AC_CONFIG_FILES([Makefile
 		src/gallium/state_trackers/vega/Makefile
 		src/gallium/state_trackers/xa/Makefile
 		src/gallium/state_trackers/xvmc/Makefile
+		src/gallium/targets/d3dadapter9/Makefile
 		src/gallium/targets/dri/Makefile
 		src/gallium/targets/egl-static/Makefile
 		src/gallium/targets/gbm/Makefile

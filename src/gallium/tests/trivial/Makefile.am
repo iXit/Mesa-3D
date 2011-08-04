@@ -14,6 +14,7 @@ AM_CPPFLAGS = \
 LDADD = \
 	$(top_builddir)/src/gallium/auxiliary/pipe-loader/libpipe_loader_client.la \
 	$(top_builddir)/src/gallium/auxiliary/libgallium.la \
+	$(top_builddir)/src/gallium/winsys/sw/wrapper/libwsw.la \
 	$(top_builddir)/src/util/libmesautil.la \
 	$(GALLIUM_PIPE_LOADER_WINSYS_LIBS) \
 	$(GALLIUM_PIPE_LOADER_CLIENT_LIBS) \

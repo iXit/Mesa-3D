@@ -132,6 +132,8 @@ nv50_screen_get_param(struct pipe_screen *pscreen, enum pipe_cap param)
       return PIPE_ENDIAN_LITTLE;
    case PIPE_CAP_MAX_TEXTURE_GATHER_COMPONENTS:
       return (class_3d >= NVA3_3D_CLASS) ? 4 : 0;
+   case PIPE_CAP_DEVICE_MEMORY_SIZE:
+      return nouveau_screen(pscreen)->device->vram_size >> 20;
 
    /* supported caps */
    case PIPE_CAP_TEXTURE_MIRROR_CLAMP:

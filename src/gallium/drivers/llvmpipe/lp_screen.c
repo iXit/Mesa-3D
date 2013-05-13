@@ -222,6 +222,9 @@ llvmpipe_get_param(struct pipe_screen *screen, enum pipe_cap param)
    case PIPE_CAP_DRAW_INDIRECT:
       return 1;
 
+   case PIPE_CAP_DEVICE_MEMORY_SIZE:
+      return 3072; /* 3 GiB to represent 32-bit address space */
+
    case PIPE_CAP_CONSTANT_BUFFER_OFFSET_ALIGNMENT:
       return 16;
    case PIPE_CAP_START_INSTANCE:

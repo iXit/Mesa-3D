@@ -195,6 +195,9 @@ The integer capabilities:
   for buffers.
 * ``PIPE_CAP_RASTERIZER_LOWER_LEFT_ORIGIN``: Indicates whether the setting of
   lower_left_origin in pipe_rasterizer_state is supported.
+* ``PIPE_CAP_DEVICE_MEMORY_SIZE``: Indicates the (approximate) size of the
+  preferred memory domain for resources (not the available space) in MiB.
+  May return 0 if the information is not available.
 * ``PIPE_CAP_TEXTURE_QUERY_LOD``: Whether the ``LODQ`` instruction is
   supported.
 * ``PIPE_CAP_MIN_TEXTURE_GATHER_OFFSET``: The minimum offset that can be used

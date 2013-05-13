@@ -234,6 +234,8 @@ static int si_get_param(struct pipe_screen* pscreen, enum pipe_cap param)
 
 	case PIPE_CAP_MAX_TEXTURE_BUFFER_SIZE:
 		return MIN2(sscreen->b.info.vram_size, 0xFFFFFFFF);
+	case PIPE_CAP_DEVICE_MEMORY_SIZE:
+		return sscreen->b.info.vram_size >> 20;
 
 	case PIPE_CAP_TEXTURE_QUERY_LOD:
 	case PIPE_CAP_TEXTURE_GATHER_SM5:

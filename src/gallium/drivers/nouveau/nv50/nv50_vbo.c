@@ -377,6 +377,13 @@ nv50_vertex_arrays_validate(struct nv50_context *nv50)
       ve = &vertex->element[i];
       vb = &nv50->vtxbuf[b];
 
+      if (ve->pipe.src_format == PIPE_FORMAT_NONE) {
+         /* skip */
+         BEGIN_NV04(push, NV50_3D(VERTEX_ARRAY_FETCH(i)), 1);
+         PUSH_DATA (push, 0);
+         continue;
+      }
+
       if (unlikely(nv50->vbo_constant & (1 << b))) {
          BEGIN_NV04(push, NV50_3D(VERTEX_ARRAY_FETCH(i)), 1);
          PUSH_DATA (push, 0);

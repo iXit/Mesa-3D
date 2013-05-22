@@ -33,6 +33,10 @@
 
 #include "nvc0/nvc0_3d.xml.h"
 
+#define NVC0_3D_VERTEX_ATTRIB_INACTIVE                                       \
+   NVC0_3D_VERTEX_ATTRIB_FORMAT_TYPE_FLOAT |                                 \
+   NVC0_3D_VERTEX_ATTRIB_FORMAT_SIZE_32 | NVC0_3D_VERTEX_ATTRIB_FORMAT_CONST
+
 void
 nvc0_vertex_state_delete(struct pipe_context *pipe,
                          void *hwcso)
@@ -82,6 +86,10 @@ nvc0_vertex_state_create(struct pipe_context *pipe,
         so->element[i].state = nvc0_format_table[fmt].vtx;
 
         if (!so->element[i].state) {
+            if (fmt == PIPE_FORMAT_NONE) {
+               so->element[i].state = NVC0_3D_VERTEX_ATTRIB_INACTIVE;
+               continue;
+            }
             switch (util_format_get_nr_components(fmt)) {
             case 1: fmt = PIPE_FORMAT_R32_FLOAT; break;
             case 2: fmt = PIPE_FORMAT_R32G32_FLOAT; break;
@@ -153,9 +161,6 @@ nvc0_vertex_state_create(struct pipe_context *pipe,
     return so;
 }
 
-#define NVC0_3D_VERTEX_ATTRIB_INACTIVE                                       \
-   NVC0_3D_VERTEX_ATTRIB_FORMAT_TYPE_FLOAT |                                 \
-   NVC0_3D_VERTEX_ATTRIB_FORMAT_SIZE_32 | NVC0_3D_VERTEX_ATTRIB_FORMAT_CONST
 
 #define VTX_ATTR(a, c, t, s)                            \
    ((NVC0_3D_VTX_ATTR_DEFINE_TYPE_##t) |                \

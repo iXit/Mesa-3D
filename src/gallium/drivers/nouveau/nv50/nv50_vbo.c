@@ -31,6 +31,11 @@
 
 #include "nv50/nv50_3d.xml.h"
 
+#define NV50_3D_VERTEX_ATTRIB_INACTIVE              \
+   NV50_3D_VERTEX_ARRAY_ATTRIB_TYPE_FLOAT |         \
+   NV50_3D_VERTEX_ARRAY_ATTRIB_FORMAT_32_32_32_32 | \
+   NV50_3D_VERTEX_ARRAY_ATTRIB_CONST
+
 void
 nv50_vertex_state_delete(struct pipe_context *pipe,
                          void *hwcso)
@@ -78,6 +83,10 @@ nv50_vertex_state_create(struct pipe_context *pipe,
         so->element[i].state = nv50_format_table[fmt].vtx;
 
         if (!so->element[i].state) {
+            if (fmt == PIPE_FORMAT_NONE) {
+               so->element[i].state = NV50_3D_VERTEX_ATTRIB_INACTIVE;
+               continue;
+            }
             switch (util_format_get_nr_components(fmt)) {
             case 1: fmt = PIPE_FORMAT_R32_FLOAT; break;
             case 2: fmt = PIPE_FORMAT_R32G32_FLOAT; break;
@@ -126,11 +135,6 @@ nv50_vertex_state_create(struct pipe_context *pipe,
 
     return so;
 }
-
-#define NV50_3D_VERTEX_ATTRIB_INACTIVE              \
-   NV50_3D_VERTEX_ARRAY_ATTRIB_TYPE_FLOAT |         \
-   NV50_3D_VERTEX_ARRAY_ATTRIB_FORMAT_32_32_32_32 | \
-   NV50_3D_VERTEX_ARRAY_ATTRIB_CONST
 
 static void
 nv50_emit_vtxattr(struct nv50_context *nv50, struct pipe_vertex_buffer *vb,

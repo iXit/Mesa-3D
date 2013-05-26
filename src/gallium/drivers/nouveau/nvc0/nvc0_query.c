@@ -439,6 +439,10 @@ nvc0_query_result(struct pipe_context *pipe, struct pipe_query *pq,
    uint64_t *data64 = (uint64_t *)q->data;
    unsigned i;
 
+   if ((int32_t)q->offset < (int32_t)q->base)
+      return FALSE; /* query never been issued */
+   /* XXX: get rid of the rotation hack */
+
 #ifdef NOUVEAU_ENABLE_DRIVER_STATISTICS
    if (q->type >= NVC0_QUERY_DRV_STAT(0) &&
        q->type <= NVC0_QUERY_DRV_STAT_LAST) {

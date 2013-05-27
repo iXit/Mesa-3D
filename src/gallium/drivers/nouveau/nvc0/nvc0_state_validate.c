@@ -304,7 +304,7 @@ nvc0_validate_scissor(struct nvc0_context *nvc0)
    nvc0->scissors_dirty = 0;
 }
 
-static void
+void
 nvc0_validate_viewport(struct nvc0_context *nvc0)
 {
    struct nouveau_pushbuf *push = nvc0->base.pushbuf;
@@ -329,21 +329,29 @@ nvc0_validate_viewport(struct nvc0_context *nvc0)
 
       /* now set the viewport rectangle to viewport dimensions for clipping */
 
-      x = util_iround(MAX2(0.0f, vp->translate[0] - fabsf(vp->scale[0])));
-      y = util_iround(MAX2(0.0f, vp->translate[1] - fabsf(vp->scale[1])));
-      w = util_iround(vp->translate[0] + fabsf(vp->scale[0])) - x;
-      h = util_iround(vp->translate[1] + fabsf(vp->scale[1])) - y;
+      if (likely(!nvc0->state.vport_bypass)) {
+          x = util_iround(MAX2(0.0f, vp->translate[0] - fabsf(vp->scale[0])));
+          y = util_iround(MAX2(0.0f, vp->translate[1] - fabsf(vp->scale[1])));
+          w = util_iround(vp->translate[0] + fabsf(vp->scale[0])) - x;
+          h = util_iround(vp->translate[1] + fabsf(vp->scale[1])) - y;
 
-      BEGIN_NVC0(push, NVC0_3D(VIEWPORT_HORIZ(i)), 2);
-      PUSH_DATA (push, (w << 16) | x);
-      PUSH_DATA (push, (h << 16) | y);
+          BEGIN_NVC0(push, NVC0_3D(VIEWPORT_HORIZ(i)), 2);
+          PUSH_DATA (push, (w << 16) | x);
+          PUSH_DATA (push, (h << 16) | y);
 
-      zmin = vp->translate[2] - fabsf(vp->scale[2]);
-      zmax = vp->translate[2] + fabsf(vp->scale[2]);
+          zmin = vp->translate[2] - fabsf(vp->scale[2]);
+          zmax = vp->translate[2] + fabsf(vp->scale[2]);
 
-      BEGIN_NVC0(push, NVC0_3D(DEPTH_RANGE_NEAR(i)), 2);
-      PUSH_DATAf(push, zmin);
-      PUSH_DATAf(push, zmax);
+          BEGIN_NVC0(push, NVC0_3D(DEPTH_RANGE_NEAR(i)), 2);
+          PUSH_DATAf(push, zmin);
+          PUSH_DATAf(push, zmax);
+      } else {
+          BEGIN_NVC0(push, NVC0_3D(VIEWPORT_HORIZ(i)), 4);
+          PUSH_DATA (push, 0xffff0000);
+          PUSH_DATA (push, 0xffff0000);
+          PUSH_DATAf(push, 0.0f); /* DEPTH_RANGE_NEAR */
+          PUSH_DATAf(push, 1.0f); /* DEPTH_RANGE_FAR */
+      }
    }
    nvc0->viewports_dirty = 0;
 }

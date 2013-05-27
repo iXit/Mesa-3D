@@ -134,6 +134,7 @@ struct nv50_ir_prog_info
    union {
       struct {
          uint32_t inputMask[4]; /* mask of attributes read (1 bit per scalar) */
+         boolean vportBypass;
       } vp;
       struct {
          uint8_t inputPatchSize;

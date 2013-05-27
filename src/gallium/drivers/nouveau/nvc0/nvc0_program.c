@@ -597,6 +597,7 @@ nvc0_program_translate(struct nvc0_program *prog, uint16_t chipset)
 
    switch (prog->type) {
    case PIPE_SHADER_VERTEX:
+      prog->vp.vport_bypass = info->prop.vp.vportBypass;
       ret = nvc0_vp_gen_header(prog, info);
       break;
 #ifdef PIPE_SHADER_HULL

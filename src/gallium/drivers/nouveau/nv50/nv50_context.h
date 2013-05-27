@@ -255,6 +255,8 @@ extern void nv50_init_state_functions(struct nv50_context *);
 
 /* nv50_state_validate.c */
 /* @words: check for space before emitting relocs */
+void nv50_validate_viewport(struct nv50_context *);
+void nv50_validate_scissor(struct nv50_context *);
 extern boolean nv50_state_validate(struct nv50_context *, uint32_t state_mask,
                                    unsigned space_words);
 

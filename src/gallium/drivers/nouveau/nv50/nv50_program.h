@@ -78,6 +78,7 @@ struct nv50_program {
       ubyte edgeflag;
       ubyte clpd[2];     /* output slot of clip distance[i]'s 1st component */
       ubyte clpd_nr;
+      boolean vport_bypass;
    } vp;
 
    struct {

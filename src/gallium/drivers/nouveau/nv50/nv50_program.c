@@ -384,6 +384,9 @@ nv50_program_translate(struct nv50_program *prog, uint16_t chipset)
       if (info->prop.fp.usesDiscard)
          prog->fp.flags[0] |= NV50_3D_FP_CONTROL_USES_KIL;
    } else
+   if (prog->type == PIPE_SHADER_VERTEX) {
+      prog->vp.vport_bypass = info->prop.vp.vportBypass;
+   } else
    if (prog->type == PIPE_SHADER_GEOMETRY) {
       switch (info->prop.gp.outputPrim) {
       case PIPE_PRIM_LINE_STRIP:

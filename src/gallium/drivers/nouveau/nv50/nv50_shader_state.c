@@ -164,6 +164,17 @@ nv50_vertprog_validate(struct nv50_context *nv50)
    PUSH_DATA (push, vp->max_gpr);
    BEGIN_NV04(push, NV50_3D(VP_START_ID), 1);
    PUSH_DATA (push, vp->code_base);
+
+   if (unlikely(nv50->state.vport_bypass != vp->vp.vport_bypass)) {
+      nv50->state.vport_bypass = vp->vp.vport_bypass;
+      BEGIN_NV04(push, NV50_3D(VIEWPORT_TRANSFORM_EN), 1);
+      PUSH_DATA (push, !vp->vp.vport_bypass);
+      /* TODO: don't do these twice if the vport changed, too: */
+      nv50_validate_viewport(nv50);
+#ifdef NV50_SCISSORS_CLIPPING
+      nv50_validate_scissor(nv50);
+#endif
+   }
 }
 
 void

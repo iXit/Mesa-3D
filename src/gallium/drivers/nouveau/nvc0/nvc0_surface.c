@@ -1199,7 +1199,8 @@ nvc0_blit_3d(struct nvc0_context *nvc0, const struct pipe_blit_info *info)
    nvc0_blitctx_post_blit(blit);
 
    /* restore viewport transform */
-   IMMED_NVC0(push, NVC0_3D(VIEWPORT_TRANSFORM_EN), 1);
+   if (!nvc0->state.vport_bypass)
+       IMMED_NVC0(push, NVC0_3D(VIEWPORT_TRANSFORM_EN), 1);
 }
 
 static void

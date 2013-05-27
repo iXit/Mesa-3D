@@ -193,7 +193,7 @@ nv50_validate_stipple(struct nv50_context *nv50)
       PUSH_DATA(push, util_bswap32(nv50->stipple.stipple[i]));
 }
 
-static void
+void
 nv50_validate_scissor(struct nv50_context *nv50)
 {
    struct nouveau_pushbuf *push = nv50->base.pushbuf;
@@ -256,7 +256,7 @@ nv50_validate_scissor(struct nv50_context *nv50)
    nv50->scissors_dirty = 0;
 }
 
-static void
+void
 nv50_validate_viewport(struct nv50_context *nv50)
 {
    struct nouveau_pushbuf *push = nv50->base.pushbuf;
@@ -269,17 +269,22 @@ nv50_validate_viewport(struct nv50_context *nv50)
       if (!(nv50->viewports_dirty & (1 << i)))
          continue;
 
-      BEGIN_NV04(push, NV50_3D(VIEWPORT_TRANSLATE_X(i)), 3);
-      PUSH_DATAf(push, vpt->translate[0]);
-      PUSH_DATAf(push, vpt->translate[1]);
-      PUSH_DATAf(push, vpt->translate[2]);
-      BEGIN_NV04(push, NV50_3D(VIEWPORT_SCALE_X(i)), 3);
-      PUSH_DATAf(push, vpt->scale[0]);
-      PUSH_DATAf(push, vpt->scale[1]);
-      PUSH_DATAf(push, vpt->scale[2]);
+      if (!nv50->state.vport_bypass) {
+         BEGIN_NV04(push, NV50_3D(VIEWPORT_TRANSLATE_X(i)), 3);
+         PUSH_DATAf(push, vpt->translate[0]);
+         PUSH_DATAf(push, vpt->translate[1]);
+         PUSH_DATAf(push, vpt->translate[2]);
+         BEGIN_NV04(push, NV50_3D(VIEWPORT_SCALE_X(i)), 3);
+         PUSH_DATAf(push, vpt->scale[0]);
+         PUSH_DATAf(push, vpt->scale[1]);
+         PUSH_DATAf(push, vpt->scale[2]);
 
-      zmin = vpt->translate[2] - fabsf(vpt->scale[2]);
-      zmax = vpt->translate[2] + fabsf(vpt->scale[2]);
+         zmin = vpt->translate[2] - fabsf(vpt->scale[2]);
+         zmax = vpt->translate[2] + fabsf(vpt->scale[2]);
+      } else {
+         zmin = 0.0f;
+         zmax = 1.0f;
+      }
 
 #ifdef NV50_SCISSORS_CLIPPING
       BEGIN_NV04(push, NV50_3D(DEPTH_RANGE_NEAR(i)), 2);

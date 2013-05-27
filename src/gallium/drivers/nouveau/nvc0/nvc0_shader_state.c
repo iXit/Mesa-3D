@@ -99,6 +99,12 @@ nvc0_vertprog_validate(struct nvc0_context *nvc0)
 
    // BEGIN_NVC0(push, NVC0_3D_(0x163c), 1);
    // PUSH_DATA (push, 0);
+
+   if (nvc0->state.vport_bypass != vp->vp.vport_bypass) {
+      nvc0->state.vport_bypass = vp->vp.vport_bypass;
+      IMMED_NVC0(push, NVC0_3D(VIEWPORT_TRANSFORM_EN), !vp->vp.vport_bypass);
+      nvc0_validate_viewport(nvc0); /* TODO: don't do this twice */
+   }
 }
 
 void

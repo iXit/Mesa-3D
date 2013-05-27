@@ -42,6 +42,7 @@ struct nvc0_program {
       uint8_t num_ucps; /* also set to max if ClipDistance is used */
       uint8_t edgeflag; /* attribute index of edgeflag input */
       boolean need_vertex_id;
+      boolean vport_bypass;
    } vp;
    struct {
       uint8_t early_z;

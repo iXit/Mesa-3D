@@ -882,6 +882,9 @@ void Source::scanProperty(const struct tgsi_full_property *prop)
    case TGSI_PROPERTY_VS_PROHIBIT_UCPS:
       info->io.genUserClip = -1;
       break;
+   case TGSI_PROPERTY_VS_WINDOW_SPACE_POSITION:
+      info->prop.vp.vportBypass = !!prop->u[0].Data;
+      break;
    default:
       INFO("unhandled TGSI property %d\n", prop->Property.PropertyName);
       break;

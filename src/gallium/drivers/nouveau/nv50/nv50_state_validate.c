@@ -234,10 +234,12 @@ nv50_validate_scissor(struct nv50_context *nv50)
          maxy = nv50->framebuffer.height;
       }
 
-      minx = MAX2(minx, (int)(vp->translate[0] - fabsf(vp->scale[0])));
-      maxx = MIN2(maxx, (int)(vp->translate[0] + fabsf(vp->scale[0])));
-      miny = MAX2(miny, (int)(vp->translate[1] - fabsf(vp->scale[1])));
-      maxy = MIN2(maxy, (int)(vp->translate[1] + fabsf(vp->scale[1])));
+      if (!nv50->state.vport_bypass) {
+         minx = MAX2(minx, (int)(vp->translate[0] - fabsf(vp->scale[0])));
+         maxx = MIN2(maxx, (int)(vp->translate[0] + fabsf(vp->scale[0])));
+         miny = MAX2(miny, (int)(vp->translate[1] - fabsf(vp->scale[1])));
+         maxy = MIN2(maxy, (int)(vp->translate[1] + fabsf(vp->scale[1])));
+      }
 
       minx = MIN2(minx, 8192);
       maxx = MAX2(maxx, 0);

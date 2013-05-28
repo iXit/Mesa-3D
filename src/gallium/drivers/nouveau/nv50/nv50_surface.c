@@ -1248,8 +1248,10 @@ nv50_blit_3d(struct nv50_context *nv50, const struct pipe_blit_info *info)
 
    /* re-enable normally constant state */
 
-   BEGIN_NV04(push, NV50_3D(VIEWPORT_TRANSFORM_EN), 1);
-   PUSH_DATA (push, 1);
+   if (!nv50->state.vport_bypass) {
+      BEGIN_NV04(push, NV50_3D(VIEWPORT_TRANSFORM_EN), 1);
+      PUSH_DATA (push, 1);
+   }
 
    nv50_blitctx_post_blit(blit);
 }

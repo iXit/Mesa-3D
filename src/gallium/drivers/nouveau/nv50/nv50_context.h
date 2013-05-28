@@ -117,6 +117,7 @@ struct nv50_context {
       boolean rt_serialize;
       boolean flushed;
       boolean rasterizer_discard;
+      boolean vport_bypass;
       uint8_t tls_required;
       boolean new_tls_space;
       uint8_t num_vtxbufs;

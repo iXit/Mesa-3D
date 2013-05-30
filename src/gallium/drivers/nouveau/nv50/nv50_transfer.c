@@ -285,6 +285,7 @@ nv50_miptree_transfer_map(struct pipe_context *pctx,
    }
 
    tx->base.stride = tx->nblocksx * util_format_get_blocksize(res->format);
+   tx->base.stride = align(tx->base.stride, 4); /* d3d9 */
    tx->base.layer_stride = tx->nblocksy * tx->base.stride;
 
    nv50_m2mf_rect_setup(&tx->rect[0], res, level, box->x, box->y, box->z);

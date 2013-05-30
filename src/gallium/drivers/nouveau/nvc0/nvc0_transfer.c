@@ -401,6 +401,7 @@ nvc0_miptree_transfer_map(struct pipe_context *pctx,
    tx->nlayers = box->depth;
 
    tx->base.stride = tx->nblocksx * util_format_get_blocksize(res->format);
+   tx->base.stride = align(tx->base.stride, 4);
    tx->base.layer_stride = tx->nblocksy * tx->base.stride;
 
    if (usage & PIPE_TRANSFER_MAP_DIRECTLY) {

@@ -184,6 +184,7 @@ st_readpixels(struct gl_context *ctx, GLint x, GLint y,
    blit.mask = st_get_blit_mask(rb->_BaseFormat, format);
    blit.filter = PIPE_TEX_FILTER_NEAREST;
    blit.scissor_enable = FALSE;
+   blit.alpha_blend = FALSE;
 
    if (st_fb_orientation(ctx->ReadBuffer) == Y_0_TOP) {
       blit.src.box.y = rb->Height - blit.src.box.y;

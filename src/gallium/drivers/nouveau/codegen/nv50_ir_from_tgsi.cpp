@@ -2548,6 +2548,20 @@ Converter::handleInstruction(const struct tgsi_full_instruction *insn)
                   srcTy, dst0[c], srcTy, src1, src2, src0);
       }
       break;
+   case TGSI_OPCODE_CND:
+      FOR_EACH_DST_ENABLED_CHANNEL(0, c, tgsi) {
+         src0 = fetchSrc(0, c);
+         src1 = fetchSrc(1, c);
+         src2 = fetchSrc(2, c);
+         if (src0 == src1) {
+            mkMov(dst0[c], src0);
+         } else {
+            val0 = getScratch(1, FILE_PREDICATE);
+            mkCmp(OP_SET, CC_GT, TYPE_F32, val0, TYPE_F32, src2, loadImm(NULL, 0.5f));
+            mkOp3(OP_SELP, TYPE_U32, dst0[c], src0, src1, val0);
+         }
+      }
+      break;
    case TGSI_OPCODE_FRC:
       FOR_EACH_DST_ENABLED_CHANNEL(0, c, tgsi) {
          src0 = fetchSrc(0, c);

@@ -397,6 +397,10 @@ nvc0_validate_vertex_buffers_shared(struct nvc0_context *nvc0)
          /* address/value set in nvc0_update_user_vbufs_shared */
          continue;
       }
+      if (!vb->buffer) {
+         IMMED_NVC0(push, NVC0_3D(VERTEX_ARRAY_FETCH(b)), 0);
+         continue;
+      }
       buf = nv04_resource(vb->buffer);
       offset = vb->buffer_offset;
       limit = buf->base.width0 - 1;

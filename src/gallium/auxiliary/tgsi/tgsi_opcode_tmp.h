@@ -57,6 +57,7 @@
 #endif
 
 OP11(ARL)
+OP11(UARL)
 OP11(MOV)
 OP11(LIT)
 OP11(RCP)

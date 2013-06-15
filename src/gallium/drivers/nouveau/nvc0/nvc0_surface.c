@@ -1205,7 +1205,15 @@ nvc0_blit_3d(struct nvc0_context *nvc0, const struct pipe_blit_info *info)
    }
    if (info->dst.box.z + info->dst.box.depth - 1)
       IMMED_NVC0(push, NVC0_3D(LAYER), 0);
-
+#if 1
+   /* reset constant vertex attribute (be nice to d3d9/st) */
+   BEGIN_NVC0(push, NVC0_3D(VTX_ATTR_DEFINE), 2);
+   PUSH_DATA (push, 0x21400);
+   PUSH_DATA (push, 0);
+   BEGIN_NVC0(push, NVC0_3D(VTX_ATTR_DEFINE), 2);
+   PUSH_DATA (push, 0x21401);
+   PUSH_DATA (push, 0);
+#endif
    nvc0_blitctx_post_blit(blit);
 
    /* restore viewport transform */

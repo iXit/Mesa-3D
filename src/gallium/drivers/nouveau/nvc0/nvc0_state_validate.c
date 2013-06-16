@@ -444,7 +444,7 @@ nvc0_validate_derived_aux_constants(struct nvc0_context *nvc0)
        !nvc0->rast)
       return;
    /* NOTE: FB Y flip doesn't affect FragCoord */
-   frag_coord_mode = nvc0->rast->api & 0x1;
+   frag_coord_mode = nvc0->rast->api & 0x3;
 
    xt = 0.0f;
    ys = 1.0f;

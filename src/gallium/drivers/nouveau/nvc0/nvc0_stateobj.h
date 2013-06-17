@@ -56,6 +56,7 @@ struct nvc0_vertex_stateobj {
    unsigned num_elements;
    uint32_t instance_elts;
    uint32_t instance_bufs;
+   uint32_t accessed_bufs;
    boolean shared_slots;
    boolean need_conversion; /* e.g. VFETCH cannot convert f64 to f32 */
    unsigned size; /* size of vertex in bytes (when packed) */

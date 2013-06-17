@@ -110,6 +110,8 @@ nvc0_vertex_state_create(struct pipe_context *pipe,
         if (so->vb_access_size[vbi] < (ve->src_offset + size))
            so->vb_access_size[vbi] = ve->src_offset + size;
 
+        so->accessed_bufs |= 1 << vbi;
+
         if (unlikely(ve->instance_divisor)) {
            so->instance_elts |= 1 << i;
            so->instance_bufs |= 1 << vbi;
@@ -381,7 +383,7 @@ nvc0_validate_vertex_buffers_shared(struct nvc0_context *nvc0)
 {
    struct nouveau_pushbuf *push = nvc0->base.pushbuf;
    unsigned b;
-   const uint32_t mask = nvc0->vbo_user;
+   const uint32_t mask = nvc0->vbo_user | ~nvc0->vertex->accessed_bufs;
 
    PUSH_SPACE(push, nvc0->num_vtxbufs * 8);
    for (b = 0; b < nvc0->num_vtxbufs; ++b) {
@@ -390,11 +392,13 @@ nvc0_validate_vertex_buffers_shared(struct nvc0_context *nvc0)
       uint32_t offset, limit;
 
       if (mask & (1 << b)) {
-         if (!(nvc0->constant_vbos & (1 << b))) {
+         /* user buffer or not accessed */
+         if (!(nvc0->constant_vbos & (1 << b)) &&
+	     nvc0->vertex->accessed_bufs & (1 << b)) {
             BEGIN_NVC0(push, NVC0_3D(VERTEX_ARRAY_FETCH(b)), 1);
             PUSH_DATA (push, NVC0_3D_VERTEX_ARRAY_FETCH_ENABLE | vb->stride);
+            /* address/value set in nvc0_update_user_vbufs_shared */
          }
-         /* address/value set in nvc0_update_user_vbufs_shared */
          continue;
       }
       if (!vb->buffer) {

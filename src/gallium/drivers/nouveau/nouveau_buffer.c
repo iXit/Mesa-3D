@@ -594,6 +594,48 @@ nouveau_copy_buffer(struct nouveau_context *nv,
 }
 
 
+/* We want to special-case constant buffer upload. */
+static void
+nouveau_buffer_transfer_inline_write(struct pipe_context *pipe,
+                                     struct pipe_resource *resource,
+                                     unsigned level,
+                                     unsigned usage,
+                                     const struct pipe_box *box,
+                                     const void *data,
+                                     unsigned stride,
+                                     unsigned layer_stride)
+{
+   struct nouveau_context *nv = nouveau_context(pipe);
+   struct pipe_transfer *transfer;
+   uint8_t *map;
+
+   assert(box->height == 1 && box->depth == 1);
+   assert(!(usage & (PIPE_TRANSFER_READ |
+                     PIPE_TRANSFER_MAP_DIRECTLY |
+                     PIPE_TRANSFER_FLUSH_EXPLICIT)));
+
+   if ((resource->bind & PIPE_BIND_CONSTANT_BUFFER) &&
+       nv->push_cb &&
+       !((box->x | box->width) & 3) &&
+       box->width < (1 << 12)) {
+      struct nv04_resource *buf = nv04_resource(resource);
+      nv->push_cb(nv,
+                  buf->bo, buf->domain, buf->offset, buf->base.width0,
+                  box->x, box->width / 4, data);
+   } else {
+      usage |= (box->x == 0 && box->width == resource->width0) ?
+         PIPE_TRANSFER_DISCARD_WHOLE_RESOURCE :
+         PIPE_TRANSFER_DISCARD_RANGE;
+
+      map = nouveau_buffer_transfer_map(pipe, resource, 0, usage, box, &transfer);
+      if (map) {
+         memcpy(map, data, box->width);
+         nouveau_buffer_transfer_unmap(pipe, transfer);
+      }
+   }
+}
+
+
 void *
 nouveau_resource_map_offset(struct nouveau_context *nv,
                             struct nv04_resource *res, uint32_t offset,
@@ -630,7 +672,7 @@ const struct u_resource_vtbl nouveau_buffer_vtbl =
    nouveau_buffer_transfer_map,          /* transfer_map */
    nouveau_buffer_transfer_flush_region, /* transfer_flush_region */
    nouveau_buffer_transfer_unmap,        /* transfer_unmap */
-   u_default_transfer_inline_write    /* transfer_inline_write */
+   nouveau_buffer_transfer_inline_write  /* transfer_inline_write */
 };
 
 struct pipe_resource *

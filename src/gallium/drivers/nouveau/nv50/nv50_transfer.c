@@ -374,33 +374,32 @@ nv50_miptree_transfer_unmap(struct pipe_context *pctx,
 
 void
 nv50_cb_push(struct nouveau_context *nv,
-             struct nouveau_bo *bo, unsigned domain,
-             unsigned base, unsigned size,
-             unsigned offset, unsigned words, const uint32_t *data)
+             struct nv04_resource *res, unsigned offset, unsigned words,
+             const uint32_t *data)
 {
    struct nouveau_pushbuf *push = nv->pushbuf;
-   struct nouveau_bufctx *bctx = nv50_context(&nv->pipe)->bufctx;
+   int8_t slot = res->cb_slot;
 
-   assert(!(offset & 3));
-   size = align(size, 0x100);
-
-   nouveau_bufctx_refn(bctx, 0, bo, NOUVEAU_BO_WR | domain);
-   nouveau_pushbuf_bufctx(push, bctx);
-   nouveau_pushbuf_validate(push);
-
-   while (words) {
-      unsigned nr;
-
-      nr = PUSH_AVAIL(push);
-      nr = MIN2(nr - 7, words);
-      nr = MIN2(nr, NV04_PFIFO_MAX_PACKET_LEN - 1);
+   if (slot < 0) {
+      slot = NV50_CB_TMP;
 
       BEGIN_NV04(push, NV50_3D(CB_DEF_ADDRESS_HIGH), 3);
-      PUSH_DATAh(push, bo->offset + base);
-      PUSH_DATA (push, bo->offset + base);
-      PUSH_DATA (push, (NV50_CB_TMP << 16) | (size & 0xffff));
+      PUSH_DATAh(push, res->address);
+      PUSH_DATA (push, res->address);
+      PUSH_DATA (push, (slot << 16) |
+                 (align(res->base.width0, 0x100) & 0xffff));
+   }
+
+   while (words) {
+      unsigned nr = MIN2(words, NV04_PFIFO_MAX_PACKET_LEN);
+
+      PUSH_SPACE(push, 16);
+      PUSH_REFN (push, res->bo, NOUVEAU_BO_WR | res->domain);
+
+      nr = MIN2(nr, PUSH_AVAIL(push) - 3);
+
       BEGIN_NV04(push, NV50_3D(CB_ADDR), 1);
-      PUSH_DATA (push, (offset << 6) | NV50_CB_TMP);
+      PUSH_DATA (push, (offset << 6) | slot);
       BEGIN_NI04(push, NV50_3D(CB_DATA(0)), nr);
       PUSH_DATAp(push, data, nr);
 
@@ -408,6 +407,4 @@ nv50_cb_push(struct nouveau_context *nv,
       data += nr;
       offset += nr * 4;
    }
-
-   nouveau_bufctx_reset(bctx, 0);
 }

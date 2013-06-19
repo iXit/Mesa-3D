@@ -292,9 +292,8 @@ nv50_m2mf_copy_linear(struct nouveau_context *pipe,
                       unsigned size);
 void
 nv50_cb_push(struct nouveau_context *nv,
-             struct nouveau_bo *bo, unsigned domain,
-             unsigned base, unsigned size,
-             unsigned offset, unsigned words, const uint32_t *data);
+             struct nv04_resource *, unsigned offset, unsigned words,
+             const uint32_t *data);
 
 /* nv50_vbo.c */
 void nv50_draw_vbo(struct pipe_context *, const struct pipe_draw_info *);

@@ -509,30 +509,28 @@ nvc0_miptree_transfer_unmap(struct pipe_context *pctx,
 /* This happens rather often with DTD9/st. */
 void
 nvc0_cb_push(struct nouveau_context *nv,
-             struct nouveau_bo *bo, unsigned domain,
-             unsigned base, unsigned size,
-             unsigned offset, unsigned words, const uint32_t *data)
+             struct nv04_resource *res, unsigned offset, unsigned words,
+             const uint32_t *data)
 {
    struct nouveau_pushbuf *push = nv->pushbuf;
 
    NOUVEAU_DRV_STAT(nv->screen, constbuf_upload_count, 1);
    NOUVEAU_DRV_STAT(nv->screen, constbuf_upload_bytes, words * 4);
 
-   assert(!(offset & 3));
-   size = align(size, 0x100);
-
    BEGIN_NVC0(push, NVC0_3D(CB_SIZE), 3);
-   PUSH_DATA (push, size);
-   PUSH_DATAh(push, bo->offset + base);
-   PUSH_DATA (push, bo->offset + base);
+   PUSH_DATA (push, align(res->base.width0, 0x100));
+   PUSH_DATAh(push, res->address);
+   PUSH_DATA (push, res->address);
 
    while (words) {
-      unsigned nr = PUSH_AVAIL(push);
-      nr = MIN2(nr, words);
-      nr = MIN2(nr, NV04_PFIFO_MAX_PACKET_LEN - 1);
+      unsigned nr = MIN2(words, NV04_PFIFO_MAX_PACKET_LEN - 1);
 
-      PUSH_SPACE(push, nr + 2);
-      PUSH_REFN (push, bo, NOUVEAU_BO_WR | domain);
+      PUSH_SPACE(push, 16);
+      PUSH_REFN (push, res->bo, NOUVEAU_BO_WR | res->domain);
+      assert(PUSH_AVAIL(push) > 2);
+
+      nr = MIN2(nr, PUSH_AVAIL(push) - 2);
+
       BEGIN_1IC0(push, NVC0_3D(CB_POS), nr + 1);
       PUSH_DATA (push, offset);
       PUSH_DATAp(push, data, nr);

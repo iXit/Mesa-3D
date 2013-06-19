@@ -529,23 +529,46 @@ nvc0_constbufs_validate(struct nvc0_context *nvc0)
             struct nouveau_bo *bo = nvc0->screen->uniform_bo;
             const unsigned base = s << 16;
             const unsigned size = nvc0->constbuf[s][0].size;
+            unsigned bind = align(size, 0x100);
+
             assert(i == 0); /* we really only want OpenGL uniforms here */
             assert(nvc0->constbuf[s][0].u.data);
 
-            if (nvc0->state.uniform_buffer_bound[s] < size) {
-               nvc0->state.uniform_buffer_bound[s] = align(size, 0x100);
+            bind = MAX2(bind, nvc0->state.uniform_buffer_bound[s]);
 
-               BEGIN_NVC0(push, NVC0_3D(CB_SIZE), 3);
-               PUSH_DATA (push, nvc0->state.uniform_buffer_bound[s]);
-               PUSH_DATAh(push, bo->offset + base);
-               PUSH_DATA (push, bo->offset + base);
+            BEGIN_NVC0(push, NVC0_3D(CB_SIZE), 3);
+            PUSH_DATA (push, bind);
+            PUSH_DATAh(push, bo->offset + base);
+            PUSH_DATA (push, bo->offset + base);
+            if (nvc0->state.uniform_buffer_bound[s] < bind) {
+               nvc0->state.uniform_buffer_bound[s] = bind;
                BEGIN_NVC0(push, NVC0_3D(CB_BIND(s)), 1);
                PUSH_DATA (push, (0 << 4) | 1);
             }
-            nvc0_cb_push(&nvc0->base, bo, NOUVEAU_BO_VRAM,
-                         base, nvc0->state.uniform_buffer_bound[s],
-                         0, (size + 3) / 4,
-                         nvc0->constbuf[s][0].u.data);
+            /* upload */
+            {
+               const uint32_t *data = nvc0->constbuf[s][0].u.data;
+               unsigned pos = 0;
+               unsigned words = (size + 3) / 4;
+
+               while (words) {
+                  unsigned nr = MIN2(words, NV04_PFIFO_MAX_PACKET_LEN - 1);
+
+                  PUSH_SPACE(push, 16);
+                  PUSH_REFN (push, bo, NOUVEAU_BO_WR | NOUVEAU_BO_VRAM);
+                  assert(PUSH_AVAIL(push) > 2);
+
+                  nr = MIN2(nr, PUSH_AVAIL(push) - 2);
+
+                  BEGIN_1IC0(push, NVC0_3D(CB_POS), nr + 1);
+                  PUSH_DATA (push, pos);
+                  PUSH_DATAp(push, data, nr);
+
+                  words -= nr;
+                  pos += nr * 4;
+                  data += nr;
+               }
+            }
          } else {
             struct nv04_resource *res =
                nv04_resource(nvc0->constbuf[s][i].u.buf);

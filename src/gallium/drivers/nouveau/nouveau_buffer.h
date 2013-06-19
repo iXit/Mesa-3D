@@ -41,6 +41,8 @@ struct nv04_resource {
    uint8_t status;
    uint8_t domain;
 
+   int8_t cb_slot; /* for nv50 */
+
    struct nouveau_fence *fence;
    struct nouveau_fence *fence_wr;
 

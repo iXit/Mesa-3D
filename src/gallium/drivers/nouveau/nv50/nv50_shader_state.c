@@ -90,11 +90,14 @@ nv50_constbufs_validate(struct nv50_context *nv50)
 
                assert(nouveau_resource_mapped_by_gpu(&res->base));
 
+               if (!nv50->constbuf[s][i].offset)
+                  res->cb_slot = b;
+
                BEGIN_NV04(push, NV50_3D(CB_DEF_ADDRESS_HIGH), 3);
                PUSH_DATAh(push, res->address + nv50->constbuf[s][i].offset);
                PUSH_DATA (push, res->address + nv50->constbuf[s][i].offset);
                PUSH_DATA (push, (b << 16) |
-                          (nv50->constbuf[s][i].size & 0xffff));
+                          (align(nv50->constbuf[s][i].size, 0x100) & 0xffff));
                BEGIN_NV04(push, NV50_3D(SET_PROGRAM_CB), 1);
                PUSH_DATA (push, (b << 12) | (i << 8) | p | 1);
 

@@ -2784,6 +2784,18 @@ Converter::handleInstruction(const struct tgsi_full_instruction *insn)
       bb->cfg.attach(&brkBB->cfg, Graph::Edge::CROSS);
    }
       break;
+   case TGSI_OPCODE_BREAKC:
+   {
+      if (bb->isTerminated())
+         break;
+      BasicBlock *nopBB = new BasicBlock(func);
+      BasicBlock *brkBB = reinterpret_cast<BasicBlock *>(breakBBs.peek().u.p);
+      mkFlow(OP_BREAK, brkBB, CC_P, fetchSrc(0, 0));
+      bb->cfg.attach(&brkBB->cfg, Graph::Edge::CROSS);
+      bb->cfg.attach(&nopBB->cfg, Graph::Edge::FORWARD);
+      setPosition(nopBB, true);
+   }
+      break;
    case TGSI_OPCODE_CONT:
    {
       if (bb->isTerminated())

@@ -78,7 +78,13 @@ objects. They all follow simple, one-method binding calls, e.g.
   and y would be [xmin..xmax-1] and [ymin..ymax-1]. The number of scissors
   should be the same as the number of set viewports and can be up to
   PIPE_MAX_VIEWPORTS.
-* ``set_viewport_states``
+  The scissor rectangle is specified in screen coordinates and is therefore
+  affected by the lower_left_origin state in the :ref:`Rasterizer`.
+* ``set_viewport_states`` specifies the conversion of clip coordinates to
+  screen coordinates.
+  Where the pixel corresponding to the screen coordinate origin (0, 0)
+  is stored in a resource depends on the lower_left_origin state in the
+  :ref:`Rasterizer`.
 
 
 Sampler Views

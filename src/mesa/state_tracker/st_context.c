@@ -198,6 +198,8 @@ st_create_context_priv( struct gl_context *ctx, struct pipe_context *pipe,
       !!(screen->get_param(screen, PIPE_CAP_TEXTURE_BORDER_COLOR_QUIRK) &
          (PIPE_QUIRK_TEXTURE_BORDER_COLOR_SWIZZLE_NV50 |
           PIPE_QUIRK_TEXTURE_BORDER_COLOR_SWIZZLE_R600));
+   st->use_rast_y_flip =
+      screen->get_param(screen, PIPE_CAP_RASTERIZER_LOWER_LEFT_ORIGIN);
 
    /* GL limits and extensions */
    st_init_limits(st);

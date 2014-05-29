@@ -266,6 +266,16 @@ half_pixel_center
            |     |
        0.5 +-----+
 
+lower_left_origin:
+    When this is true, the screen coordinate origin (0, 0) is considered to be
+    the lower left corner.
+    This means that a pixel with screen-space coordinates (0, 0) will be stored
+    at the last line (y = height - 1) of the resource storage as far as
+    operations like blit and transfers are concerned.
+    Note that scissor state is specified in screen coordinates.
+    This setting is only legal if PIPE_CAP_RASTERIZER_LOWER_LEFT_ORIGIN is true.
+    If this is set, bottom_edge_rule must be set to true as well.
+
 bottom_edge_rule
     Determines what happens when a pixel sample lies precisely on a triangle
     edge.
@@ -274,15 +284,16 @@ bottom_edge_rule
     lies on the *bottom edge* or *left edge* (e.g., OpenGL drawables)::
 
         0                    x
-      0 +--------------------->
-        |
-        |  +-------------+
-        |  |             |
-        |  |             |
-        |  |             |
-        |  +=============+
-        |
-      y V
+      0 +--------------------->   y ^ (if lower_left_origin is true)
+        |                           |
+        |  +-------------+          | +=============+
+        |  |             |          | |             |
+        |  |             |          | |             |
+        |  |             |          | |             |
+        |  +=============+          | +-------------+
+        |                           |
+      y V                         0 +--------------------->
+                                    0                    x
 
     When false, a pixel sample is considered to lie inside of a triangle if it
     lies on the *top edge* or *left edge* (e.g., OpenGL FBOs, D3D)::
@@ -309,8 +320,13 @@ bottom_edge_rule
 
         Actually all graphics APIs use a top-left rasterization rule for pixel
         ownership, but their notion of top varies with the axis origin (which
-        can be either at y = 0 or at y = height).  Gallium instead always
-        assumes that top is always at y=0.
+        can be either at y = 0 or at y = height).
+
+        If PIPE_CAP_RASTERIZER_LOWER_LEFT_ORIGIN is advertised, this setting
+        must be set to true if lower_left_origin is true.
+        (This is because some hardware only supports switching the edge rule
+         implicitly by flipping the origin, while other hardware has a setting
+         for the edge rule but cannot flip the origin.)
 
     See also:
      - http://msdn.microsoft.com/en-us/library/windows/desktop/cc627092.aspx

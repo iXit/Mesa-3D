@@ -90,6 +90,7 @@ struct st_context
 
    boolean needs_texcoord_semantic;
    boolean apply_texture_swizzle_to_border_color;
+   boolean use_rast_y_flip;
 
    /* On old libGL's for linux we need to invalidate the drawables
     * on glViewpport calls, this is set via a option.

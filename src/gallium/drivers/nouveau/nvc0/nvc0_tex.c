@@ -497,9 +497,9 @@ nve4_set_tex_handles(struct nvc0_context *nvc0)
 
    if (nvc0->screen->base.class_3d < NVE4_3D_CLASS)
       return;
-   address = nvc0->screen->uniform_bo->offset + (5 << 16);
+   address = nvc0->screen->uniform_bo->offset + NVC0_CB_AUX_BASE(0);
 
-   for (s = 0; s < 5; ++s, address += (1 << 9)) {
+   for (s = 0; s < 5; ++s, address += NVC0_CB_AUX_STAGE_STRIDE) {
       uint32_t dirty = nvc0->textures_dirty[s] | nvc0->samplers_dirty[s];
       if (!dirty)
          continue;

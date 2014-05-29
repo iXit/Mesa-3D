@@ -313,6 +313,11 @@ nvc0_rasterizer_state_create(struct pipe_context *pipe,
     SB_BEGIN_3D(so, VIEW_VOLUME_CLIP_CTRL, 1);
     SB_DATA    (so, reg);
 
+    so->api =
+       (!cso->half_pixel_center << 0) |
+       (!cso->lower_left_origin << 1) |
+       (cso->clip_halfz << 2);
+
     assert(so->size <= (sizeof(so->state) / sizeof(so->state[0])));
     return (void *)so;
 }

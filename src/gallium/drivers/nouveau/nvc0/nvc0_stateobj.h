@@ -22,6 +22,7 @@ struct nvc0_blend_stateobj {
 
 struct nvc0_rasterizer_stateobj {
    struct pipe_rasterizer_state pipe;
+   uint8_t api; /* some OGL/D3D switch bits from pipe, for quick comparison */
    int size;
    uint32_t state[43];
 };

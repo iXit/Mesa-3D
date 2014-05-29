@@ -112,12 +112,12 @@ nouveau_codegen(int chipset, int type, struct tgsi_token tokens[],
    info.bin.sourceRep = NV50_PROGRAM_IR_TGSI;
    info.bin.source = tokens;
 
-   info.io.ucpCBSlot = 15;
+   info.io.auxCBSlot = 15;
    info.io.ucpBase = NV50_CB_AUX_UCP_OFFSET;
 
    info.io.resInfoCBSlot = 15;
    info.io.suInfoBase = NV50_CB_AUX_TEX_MS_OFFSET;
-   info.io.msInfoCBSlot = 15;
+   info.io.auxCBSlot = 15;
    info.io.msInfoBase = NV50_CB_AUX_MS_OFFSET;
 
    info.assignSlots = dummy_assign_slots;

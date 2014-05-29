@@ -18,6 +18,27 @@
 #define NVC0_MAX_PIPE_CONSTBUFS         14
 #define NVE4_MAX_PIPE_CONSTBUFS_COMPUTE  7
 
+/* auxiliary CB layout */
+#define NVC0_CB_AUX_SLOT               15
+#define NVC0_CB_AUX_STAGE_STRIDE      (1 << 9)
+#define NVC0_CB_AUX_BASE(s)           ((5 << 16) + ((s) << 9))
+#define NVC0_CB_AUX_SIZE               0x200
+#define NVE4_CB_AUX_TEX_BIND_OFFSET    0x020
+#define NVE4_CB_AUX_TEX_BIND_BASE(s)  (NVC0_CB_AUX_BASE(s) + 0x020)
+#define NVE4_CB_AUX_TEX_BIND_SIZE      0x80
+#define NVC0_CB_AUX_UCP_OFFSET         0x100
+#define NVC0_CB_AUX_UCP_BASE(s)       (NVC0_CB_AUX_BASE(s) + 0x100)
+#define NVC0_CB_AUX_UCP_SIZE           0x80
+#define NVC0_CB_AUX_MS_INFO_OFFSET     0x180
+#define NVC0_CB_AUX_MS_INFO_BASE      (NVC0_CB_AUX_BASE(s) + 0x180)
+#define NVC0_CB_AUX_MS_INFO_SIZE       0x70
+#define NVC0_CB_AUX_FCOORD_ADJ_OFFSET  0x1f0
+#define NVC0_CB_AUX_FCOORD_ADJ_BASE   (NVC0_CB_AUX_BASE(s) + 0x1f0)
+#define NVC0_CB_AUX_FCOORD_ADJ_SIZE    0x10
+#define NVE4_CB_AUX_SU_INFO_OFFSET     0x200
+#define NVE4_CB_AUX_SU_INFO_BASE      (NVC0_CB_AUX_BASE(s) + 0x200)
+#define NVE4_CB_AUX_SU_INFO_SIZE       0x400
+
 #define NVC0_MAX_SURFACE_SLOTS 16
 
 #define NVC0_MAX_VIEWPORTS 16

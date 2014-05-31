@@ -841,6 +841,7 @@ st_TexSubImage(struct gl_context *ctx, GLuint dims,
    blit.mask = st_get_blit_mask(format, texImage->_BaseFormat);
    blit.filter = PIPE_TEX_FILTER_NEAREST;
    blit.scissor_enable = FALSE;
+   blit.alpha_blend = FALSE;
 
    st->pipe->blit(st->pipe, &blit);
 
@@ -1088,6 +1089,7 @@ st_GetTexImage(struct gl_context * ctx,
    blit.mask = st_get_blit_mask(texImage->_BaseFormat, format);
    blit.filter = PIPE_TEX_FILTER_NEAREST;
    blit.scissor_enable = FALSE;
+   blit.alpha_blend = FALSE;
 
    /* blit/render/decompress */
    st->pipe->blit(st->pipe, &blit);
@@ -1454,6 +1456,7 @@ st_CopyTexSubImage(struct gl_context *ctx, GLuint dims,
    blit.dst.box.depth = 1;
    blit.mask = st_get_blit_mask(rb->_BaseFormat, texImage->_BaseFormat);
    blit.filter = PIPE_TEX_FILTER_NEAREST;
+   blit.alpha_blend = FALSE;
    pipe->blit(pipe, &blit);
    return;
 

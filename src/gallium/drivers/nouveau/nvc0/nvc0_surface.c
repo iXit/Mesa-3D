@@ -861,7 +861,7 @@ nvc0_blit_set_src(struct nvc0_blitctx *ctx,
 }
 
 static void
-nvc0_blitctx_prepare_state(struct nvc0_blitctx *blit)
+nvc0_blitctx_prepare_state(struct nvc0_blitctx *blit, boolean alpha_blend)
 {
    struct nouveau_pushbuf *push = blit->nvc0->base.pushbuf;
 
@@ -873,7 +873,17 @@ nvc0_blitctx_prepare_state(struct nvc0_blitctx *blit)
    /* blend state */
    BEGIN_NVC0(push, NVC0_3D(COLOR_MASK(0)), 1);
    PUSH_DATA (push, blit->color_mask);
-   IMMED_NVC0(push, NVC0_3D(BLEND_ENABLE(0)), 0);
+   if (alpha_blend) {
+      BEGIN_NVC0(push, NVC0_3D(BLEND_EQUATION_RGB), 5);
+      PUSH_DATA (push, NVC0_3D_BLEND_EQUATION_RGB_FUNC_ADD);
+      PUSH_DATA (push, NV50_3D_BLEND_FACTOR_SRC_ALPHA); /* SRC_RGB */
+      PUSH_DATA (push, NV50_3D_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA); /* DST_RGB */
+      PUSH_DATA (push, NVC0_3D_BLEND_EQUATION_ALPHA_FUNC_ADD);
+      PUSH_DATA (push, NV50_3D_BLEND_FACTOR_SRC_ALPHA); /* SRC_ALPHA */
+      BEGIN_NVC0(push, NVC0_3D(BLEND_FUNC_DST_ALPHA), 1);
+      PUSH_DATA (push, NV50_3D_BLEND_FACTOR_DST_ALPHA); /* DST_ALPHA */
+   }
+   IMMED_NVC0(push, NVC0_3D(BLEND_ENABLE(0)), alpha_blend);
    IMMED_NVC0(push, NVC0_3D(LOGIC_OP_ENABLE), 0);
 
    /* rasterizer state */
@@ -1059,7 +1069,7 @@ nvc0_blit_3d(struct nvc0_context *nvc0, const struct pipe_blit_info *info)
    nvc0_blit_set_src(blit, src, info->src.level, -1, info->src.format,
                      blit->filter);
 
-   nvc0_blitctx_prepare_state(blit);
+   nvc0_blitctx_prepare_state(blit, info->alpha_blend);
 
    nvc0_state_validate(nvc0, ~0, 48);
 
@@ -1277,6 +1287,11 @@ nvc0_blit_eng2d(struct nvc0_context *nvc0, const struct pipe_blit_info *info)
          PUSH_DATA (push, NVC0_2D_OPERATION_SRCCOPY_PREMULT);
       }
    }
+   if (info->alpha_blend) {
+      BEGIN_NVC0(push, NVC0_2D(BETA4), 2);
+      PUSH_DATA (push, mask);
+      PUSH_DATA (push, NVC0_2D_OPERATION_BLEND_PREMULT);
+   }
 
    if (src->ms_x > dst->ms_x || src->ms_y > dst->ms_y) {
       /* ms_x is always >= ms_y */
@@ -1369,7 +1384,7 @@ nvc0_blit_eng2d(struct nvc0_context *nvc0, const struct pipe_blit_info *info)
 
    if (info->scissor_enable)
       IMMED_NVC0(push, NVC0_2D(CLIP_ENABLE), 0);
-   if (mask != 0xffffffff)
+   if (mask != 0xffffffff || info->alpha_blend)
       IMMED_NVC0(push, NVC0_2D(OPERATION), NVC0_2D_OPERATION_SRCCOPY);
    if (nvc0->cond_query && info->render_condition_enable)
       IMMED_NVC0(push, NVC0_2D(COND_MODE), NVC0_2D_COND_MODE_ALWAYS);

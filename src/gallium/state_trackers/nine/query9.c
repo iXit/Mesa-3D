@@ -180,11 +180,16 @@ NineQuery9_Issue( struct NineQuery9 *This,
     }
 
     if (dwIssueFlags == D3DISSUE_BEGIN) {
+        if (This->state == NINE_QUERY_STATE_RUNNING) {
+	    pipe->end_query(pipe, This->pq);
+	}
         pipe->begin_query(pipe, This->pq);
         This->state = NINE_QUERY_STATE_RUNNING;
     } else {
-        pipe->end_query(pipe, This->pq);
-        This->state = NINE_QUERY_STATE_ENDED;
+        if (This->state == NINE_QUERY_STATE_RUNNING) {
+            pipe->end_query(pipe, This->pq);
+            This->state = NINE_QUERY_STATE_ENDED;
+	}
     }
     return D3D_OK;
 }

@@ -181,13 +181,8 @@ display_format( D3DFORMAT fmt,
         D3DFMT_X8R8G8B8,
         D3DFMT_X1R5G5B5,
         D3DFMT_R5G6B5,
-#ifndef NINE_STRICT
-        D3DFMT_UNKNOWN /* XXX What does this mean ? */
-#endif
     };
     unsigned i;
-
-    user_warn(fmt == D3DFMT_UNKNOWN);
 
     if (fmt == D3DFMT_A2R10G10B10 && win) { return FALSE; }
 
@@ -223,10 +218,6 @@ NineAdapter9_CheckDeviceFormat( struct NineAdapter9 *This,
     hr = NineAdapter9_GetScreen(This, DeviceType, &screen);
     if (FAILED(hr))
         return hr;
-#ifndef NINE_STRICT
-    if (AdapterFormat != D3DFMT_UNKNOWN) {
-        /* XXX SC2 tries this, is this because of us or should this be OK ? */
-#endif
     pf = d3d9_to_pipe_format(AdapterFormat);
     if (pf == PIPE_FORMAT_NONE ||
         !screen->is_format_supported(screen, pf, PIPE_TEXTURE_2D, 0,
@@ -236,9 +227,6 @@ NineAdapter9_CheckDeviceFormat( struct NineAdapter9 *This,
             d3dformat_to_string(AdapterFormat));
         return D3DERR_NOTAVAILABLE;
     }
-#ifndef NINE_STRICT
-    }
-#endif
 
     /* Check actual format. */
 

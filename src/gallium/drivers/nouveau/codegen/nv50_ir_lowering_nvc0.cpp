@@ -1381,6 +1381,7 @@ NVC0LoweringPass::handleRDSV(Instruction *i)
          bld.mkOp3(OP_MAD, TYPE_F32, dst, dst, loadFCoordAdj32(0x0), t);
       }
       break;
+   }
    case SV_FACE:
    {
       Value *face = i->getDef(0);

@@ -1363,7 +1363,6 @@ NVC0LoweringPass::handleRDSV(Instruction *i)
 
    switch (sv) {
    case SV_POSITION:
-   {
       assert(prog->getType() == Program::TYPE_FRAGMENT);
       LValue *dst = i->getDef(0)->asLValue();
       if (i->srcExists(1)) {

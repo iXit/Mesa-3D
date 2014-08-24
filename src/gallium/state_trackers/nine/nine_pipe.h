@@ -39,7 +39,7 @@ void nine_convert_rasterizer_state(struct cso_context *, const DWORD *);
 void nine_convert_blend_state(struct cso_context *, const DWORD *);
 void nine_convert_sampler_state(struct cso_context *, int idx, const DWORD *);
 
-void nine_pipe_context_clear(struct cso_context *, struct pipe_context *);
+void nine_pipe_context_clear(struct NineDevice9 *);
 
 static INLINE unsigned d3dlock_buffer_to_pipe_transfer_usage(DWORD Flags)
 {

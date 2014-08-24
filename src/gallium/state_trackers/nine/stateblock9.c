@@ -296,7 +296,8 @@ nine_state_copy_common_all(struct nine_state *dst,
                            const struct nine_state *src,
                            struct nine_state *help,
                            const boolean apply,
-                           struct nine_range_pool *pool)
+                           struct nine_range_pool *pool,
+                           const int MaxStreams)
 {
     unsigned i;
 
@@ -379,8 +380,8 @@ nine_state_copy_common_all(struct nine_state *dst,
         }
         dst->stream_instancedata_mask = src->stream_instancedata_mask;
         if (apply) {
-            dst->changed.vtxbuf = (1ULL << PIPE_MAX_ATTRIBS) - 1;
-            dst->changed.stream_freq = (1ULL << PIPE_MAX_ATTRIBS) - 1;
+            dst->changed.vtxbuf = (1ULL << MaxStreams) - 1;
+            dst->changed.stream_freq = (1ULL << MaxStreams) - 1;
         }
     }
 
@@ -438,12 +439,13 @@ NineStateBlock9_Capture( struct NineStateBlock9 *This )
 {
     struct nine_state *dst = &This->state;
     struct nine_state *src = &This->base.device->state;
+    const int MaxStreams = This->base.device->caps.MaxStreams;
     unsigned s;
 
     DBG("This=%p\n", This);
 
     if (This->type == NINESBT_ALL)
-        nine_state_copy_common_all(dst, src, dst, FALSE, NULL);
+        nine_state_copy_common_all(dst, src, dst, FALSE, NULL, MaxStreams);
     else
         nine_state_copy_common(dst, src, dst, FALSE, NULL);
 
@@ -468,12 +470,13 @@ NineStateBlock9_Apply( struct NineStateBlock9 *This )
     struct nine_state *dst = &This->base.device->state;
     struct nine_state *src = &This->state;
     struct nine_range_pool *pool = &This->base.device->range_pool;
+    const int MaxStreams = This->base.device->caps.MaxStreams;
     unsigned s;
 
     DBG("This=%p\n", This);
 
     if (This->type == NINESBT_ALL)
-        nine_state_copy_common_all(dst, src, src, TRUE, pool);
+        nine_state_copy_common_all(dst, src, src, TRUE, pool, MaxStreams);
     else
         nine_state_copy_common(dst, src, src, TRUE, pool);
 

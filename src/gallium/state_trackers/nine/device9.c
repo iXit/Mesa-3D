@@ -124,7 +124,7 @@ NineDevice9_RestoreNonCSOState( struct NineDevice9 *This, unsigned mask )
     }
 
     This->state.changed.group = NINE_STATE_ALL;
-    This->state.changed.vtxbuf = (1ULL << PIPE_MAX_ATTRIBS) - 1;
+    This->state.changed.vtxbuf = (1ULL << This->caps.MaxStreams) - 1;
     This->state.changed.ucp = (1 << PIPE_MAX_CLIP_PLANES) - 1;
     This->state.changed.texture = NINE_PS_SAMPLERS_MASK | NINE_VS_SAMPLERS_MASK;
 }
@@ -322,7 +322,7 @@ NineDevice9_dtor( struct NineDevice9 *This )
     DBG("This=%p\n", This);
 
     if (This->pipe && This->cso)
-        nine_pipe_context_clear(This->cso, This->pipe);
+        nine_pipe_context_clear(This);
     nine_ff_fini(This);
     nine_state_clear(&This->state, TRUE);
 
@@ -609,7 +609,7 @@ NineDevice9_Reset( struct NineDevice9 *This,
     if (FAILED(hr))
         return (hr == D3DERR_OUTOFVIDEOMEMORY) ? hr : D3DERR_DEVICELOST;
 
-    nine_pipe_context_clear(This->cso, This->pipe);
+    nine_pipe_context_clear(This);
     nine_state_clear(&This->state, TRUE);
 
     NineDevice9_SetDefaultState(This, TRUE);

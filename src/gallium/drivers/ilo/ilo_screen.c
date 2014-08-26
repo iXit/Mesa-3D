@@ -435,6 +435,7 @@ ilo_get_param(struct pipe_screen *screen, enum pipe_cap param)
       return 0;
    case PIPE_CAP_BUFFER_MAP_PERSISTENT_COHERENT:
       return true;
+   case PIPE_CAP_RASTERIZER_LOWER_LEFT_ORIGIN:
    case PIPE_CAP_FAKE_SW_MSAA:
    case PIPE_CAP_TEXTURE_QUERY_LOD:
    case PIPE_CAP_SAMPLE_SHADING:

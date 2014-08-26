@@ -160,6 +160,8 @@ llvmpipe_get_param(struct pipe_screen *screen, enum pipe_cap param)
       return 1;
    case PIPE_CAP_TGSI_FS_COORD_ORIGIN_LOWER_LEFT:
       return 0;
+   case PIPE_CAP_RASTERIZER_LOWER_LEFT_ORIGIN:
+      return 0;
    case PIPE_CAP_PRIMITIVE_RESTART:
       return 1;
    case PIPE_CAP_DEPTH_CLIP_DISABLE:

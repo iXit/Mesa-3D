@@ -185,6 +185,7 @@ softpipe_get_param(struct pipe_screen *screen, enum pipe_cap param)
       return 0;
    case PIPE_CAP_TGSI_TEXCOORD:
    case PIPE_CAP_PREFER_BLIT_BASED_TEXTURE_TRANSFER:
+   case PIPE_CAP_RASTERIZER_LOWER_LEFT_ORIGIN:
       return 0;
    case PIPE_CAP_MAX_VIEWPORTS:
       return 1;

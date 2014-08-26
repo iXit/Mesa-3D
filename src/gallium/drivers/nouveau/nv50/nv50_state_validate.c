@@ -24,6 +24,22 @@ nv50_validate_fb(struct nv50_context *nv50)
    unsigned ms_mode = NV50_3D_MULTISAMPLE_MODE_MS1;
    uint32_t array_size = 0xffff, array_mode = 0;
 
+   if (nv50->framebuffer.nr_cbufs == 0) {
+      /* XXX: Does RT_CONTROL affect speed of z-only rendering ?
+       * Set it to 0 when we can to be safe.
+       */
+      BEGIN_NV04(push, NV50_3D(RT_CONTROL), 1);
+      if (nv50->zsa->pipe.alpha.enabled) {
+         /* need at least 1 RT to make alpha test work */
+         PUSH_DATA (push, 1);
+         nv50_fb_set_null_rt(push, 0);
+      } else {
+         PUSH_DATA (push, 0);
+      }
+   }
+   if (!(nv50->dirty & NV50_NEW_FRAMEBUFFER))
+      return; /* only ZSA changed */
+
    nouveau_bufctx_reset(nv50->bufctx_3d, NV50_BIND_FB);
 
    BEGIN_NV04(push, NV50_3D(RT_CONTROL), 1);
@@ -429,7 +445,7 @@ static struct state_validate {
     void (*func)(struct nv50_context *);
     uint32_t states;
 } validate_list[] = {
-    { nv50_validate_fb,            NV50_NEW_FRAMEBUFFER },
+    { nv50_validate_fb,            NV50_NEW_FRAMEBUFFER | NV50_NEW_ZSA },
     { nv50_validate_blend,         NV50_NEW_BLEND },
     { nv50_validate_zsa,           NV50_NEW_ZSA },
     { nv50_validate_sample_mask,   NV50_NEW_SAMPLE_MASK },

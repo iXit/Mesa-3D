@@ -1019,10 +1019,19 @@ NVC0LoweringPass::loadResInfo32(Value *ptr, uint32_t off)
 inline Value *
 NVC0LoweringPass::loadMsInfo32(Value *ptr, uint32_t off)
 {
-   uint8_t b = prog->driver->io.msInfoCBSlot;
+   uint8_t b = prog->driver->io.auxCBSlot;
    off += prog->driver->io.msInfoBase;
    return bld.
       mkLoadv(TYPE_U32, bld.mkSymbol(FILE_MEMORY_CONST, b, TYPE_U32, off), ptr);
+}
+
+inline Value *
+NVC0LoweringPass::loadFCoordAdj32(uint32_t p)
+{
+   uint8_t b = prog->driver->io.auxCBSlot;
+   p += prog->driver->io.fCoordAdjBase;
+   return bld.
+      mkLoadv(TYPE_U32, bld.mkSymbol(FILE_MEMORY_CONST, b, TYPE_U32, p), NULL);
 }
 
 /* On nvc0, surface info is obtained via the surface binding points passed
@@ -1422,13 +1431,14 @@ NVC0LoweringPass::handleRDSV(Instruction *i)
 {
    Symbol *sym = i->getSrc(0)->asSym();
    const SVSemantic sv = sym->reg.data.sv.sv;
+   const int svIndex = sym->reg.data.sv.index;
    Value *vtx = NULL;
    Instruction *ld;
    uint32_t addr = targ->getSVAddress(FILE_SHADER_INPUT, sym);
 
    if (addr >= 0x400) {
       // mov $sreg
-      if (sym->reg.data.sv.index == 3) {
+      if (svIndex == 3) {
          // TGSI backend may use 4th component of TID,NTID,CTAID,NCTAID
          i->op = OP_MOV;
          i->setSrc(0, bld.mkImm((sv == SV_NTID || sv == SV_NCTAID) ? 1 : 0));
@@ -1438,15 +1448,26 @@ NVC0LoweringPass::handleRDSV(Instruction *i)
 
    switch (sv) {
    case SV_POSITION:
+   {
       assert(prog->getType() == Program::TYPE_FRAGMENT);
+      LValue *dst = i->getDef(0)->asLValue();
+
       if (i->srcExists(1)) {
          // Pass offset through to the interpolation logic
          ld = bld.mkInterp(NV50_IR_INTERP_LINEAR | NV50_IR_INTERP_OFFSET,
-                           i->getDef(0), addr, NULL);
+                           dst, addr, NULL);
          ld->setSrc(1, i->getSrc(1));
       } else {
-         bld.mkInterp(NV50_IR_INTERP_LINEAR, i->getDef(0), addr, NULL);
+         bld.mkInterp(NV50_IR_INTERP_LINEAR, dst, addr, NULL);
       }
+
+      if (svIndex == 0) {
+         bld.mkOp2(OP_ADD, TYPE_F32, dst, dst, loadFCoordAdj32(0x8));
+      } else if (svIndex == 1) {
+         Value *t = loadFCoordAdj32(0x4);
+         bld.mkOp3(OP_MAD, TYPE_F32, dst, dst, loadFCoordAdj32(0x0), t);
+      }
+   }
       break;
    case SV_FACE:
    {
@@ -1460,13 +1481,13 @@ NVC0LoweringPass::handleRDSV(Instruction *i)
       break;
    case SV_TESS_COORD:
       assert(prog->getType() == Program::TYPE_TESSELLATION_EVAL);
-      readTessCoord(i->getDef(0)->asLValue(), i->getSrc(0)->reg.data.sv.index);
+      readTessCoord(i->getDef(0)->asLValue(), svIndex);
       break;
    case SV_NTID:
    case SV_NCTAID:
    case SV_GRIDID:
       assert(targ->getChipset() >= NVISA_GK104_CHIPSET); // mov $sreg otherwise
-      if (sym->reg.data.sv.index == 3) {
+      if (svIndex == 3) {
          i->op = OP_MOV;
          i->setSrc(0, bld.mkImm(sv == SV_GRIDID ? 0 : 1));
          return true;

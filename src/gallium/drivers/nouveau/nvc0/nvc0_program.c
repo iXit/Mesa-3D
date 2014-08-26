@@ -463,6 +463,7 @@ nvc0_fp_gen_header(struct nvc0_program *fp, struct nv50_ir_prog_info *info)
    }
 
    fp->fp.early_z = info->prop.fp.earlyFragTests;
+   fp->fp.frag_coord_mode = info->prop.fp.fragCoordMode;
 
    return 0;
 }
@@ -538,29 +539,29 @@ nvc0_program_translate(struct nvc0_program *prog, uint16_t chipset)
    info->bin.sourceRep = NV50_PROGRAM_IR_TGSI;
    info->bin.source = (void *)prog->pipe.tokens;
 
-   info->io.genUserClip = prog->vp.num_ucps;
-   info->io.ucpBase = 256;
-   info->io.ucpCBSlot = 15;
    info->io.sampleInterp = prog->fp.sample_interp;
 
    if (prog->type == PIPE_SHADER_COMPUTE) {
+      info->io.auxCBSlot = 0;
+      info->io.msInfoBase = NVE4_CP_INPUT_MS_OFFSETS;
       if (chipset >= NVISA_GK104_CHIPSET) {
          info->io.resInfoCBSlot = 0;
          info->io.texBindBase = NVE4_CP_INPUT_TEX(0);
          info->io.suInfoBase = NVE4_CP_INPUT_SUF(0);
          info->prop.cp.gridInfoBase = NVE4_CP_INPUT_GRID_INFO(0);
       }
-      info->io.msInfoCBSlot = 0;
-      info->io.msInfoBase = NVE4_CP_INPUT_MS_OFFSETS;
    } else {
+      info->io.auxCBSlot = NVC0_CB_AUX_SLOT;
+      info->io.genUserClip = prog->vp.num_ucps;
+      info->io.ucpBase = NVC0_CB_AUX_UCP_OFFSET;
+      info->io.fCoordAdjBase = NVC0_CB_AUX_FCOORD_ADJ_OFFSET;
+      info->io.msInfoBase = NVC0_CB_AUX_MS_INFO_OFFSET; /* TODO */
       if (chipset >= NVISA_GK104_CHIPSET) {
-         info->io.texBindBase = 0x20;
-         info->io.suInfoBase = 0; /* TODO */
+         info->io.texBindBase = NVE4_CB_AUX_TEX_BIND_OFFSET;
+         info->io.suInfoBase = NVE4_CB_AUX_SU_INFO_OFFSET; /* TODO */
       }
       info->io.resInfoCBSlot = 15;
       info->io.sampleInfoBase = 256 + 128;
-      info->io.msInfoCBSlot = 15;
-      info->io.msInfoBase = 0; /* TODO */
    }
 
    info->assignSlots = nvc0_program_assign_varying_slots;

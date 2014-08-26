@@ -53,13 +53,12 @@
  *     good.)
  *
  *  ! pipe_rasterizer_state.line_last_pixel is ignored - it is never drawn
+ *    (There does not seem to be a hardware switch for this.
+ *     Note that the pixel center setting affects line rasterization if the
+ *     vertex coordinates are not adjusted to compensate.)
  *
  *  ! pipe_rasterizer_state.flatshade_first also applies to QUADS
  *    (There's a GL query for that, forcing an exception is just ridiculous.)
- *
- *  ! pipe_rasterizer_state.half_pixel_center is ignored - pixel centers
- *     are always at half integer coordinates and the top-left rule applies
- *    (There does not seem to be a hardware switch for this.)
  *
  *  ! pipe_rasterizer_state.sprite_coord_enable is masked with 0xff on NVC0
  *    (The hardware only has 8 slots meant for TexCoord and we have to assign

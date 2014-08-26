@@ -320,6 +320,8 @@ nvc0_create(struct pipe_screen *pscreen, void *priv)
    /* shader builtin library is per-screen, but we need a context for m2mf */
    nvc0_program_library_upload(nvc0);
 
+   nvc0->state.rasterizer_api = 0x2; /* upper left origin */
+
    /* add permanently resident buffers to bufctxts */
 
    flags = NOUVEAU_BO_VRAM | NOUVEAU_BO_RD;

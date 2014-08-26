@@ -799,7 +799,7 @@ nvc0_screen_create(struct nouveau_device *dev)
       PUSH_DATA (push, NVC0_3D_TEX_MISC_SEAMLESS_CUBE_MAP);
    } else {
       BEGIN_NVC0(push, NVE4_3D(TEX_CB_INDEX), 1);
-      PUSH_DATA (push, 15);
+      PUSH_DATA (push, NVC0_CB_AUX_SLOT);
    }
    BEGIN_NVC0(push, NVC0_3D(CALL_LIMIT_LOG), 1);
    PUSH_DATA (push, 8); /* 128 */
@@ -854,9 +854,9 @@ nvc0_screen_create(struct nouveau_device *dev)
 
    /* return { 0.0, 0.0, 0.0, 0.0 } for out-of-bounds vtxbuf access */
    BEGIN_NVC0(push, NVC0_3D(CB_SIZE), 3);
-   PUSH_DATA (push, 256);
-   PUSH_DATAh(push, screen->uniform_bo->offset + (5 << 16) + (6 << 9));
-   PUSH_DATA (push, screen->uniform_bo->offset + (5 << 16) + (6 << 9));
+   PUSH_DATA (push, NVC0_CB_AUX_UCP_OFFSET);
+   PUSH_DATAh(push, screen->uniform_bo->offset + NVC0_CB_AUX_BASE(6));
+   PUSH_DATA (push, screen->uniform_bo->offset + NVC0_CB_AUX_BASE(6));
    BEGIN_1IC0(push, NVC0_3D(CB_POS), 5);
    PUSH_DATA (push, 0);
    PUSH_DATAf(push, 0.0f);
@@ -864,8 +864,8 @@ nvc0_screen_create(struct nouveau_device *dev)
    PUSH_DATAf(push, 0.0f);
    PUSH_DATAf(push, 0.0f);
    BEGIN_NVC0(push, NVC0_3D(VERTEX_RUNOUT_ADDRESS_HIGH), 2);
-   PUSH_DATAh(push, screen->uniform_bo->offset + (5 << 16) + (6 << 9));
-   PUSH_DATA (push, screen->uniform_bo->offset + (5 << 16) + (6 << 9));
+   PUSH_DATAh(push, screen->uniform_bo->offset + NVC0_CB_AUX_BASE(6));
+   PUSH_DATA (push, screen->uniform_bo->offset + NVC0_CB_AUX_BASE(6));
 
    if (dev->drm_version >= 0x01000101) {
       ret = nouveau_getparam(dev, NOUVEAU_GETPARAM_GRAPH_UNITS, &value);

@@ -46,7 +46,7 @@ update_viewport( struct st_context *st )
    int i;
    /* _NEW_BUFFERS
     */
-   if (st_fb_orientation(ctx->DrawBuffer) == Y_0_TOP) {
+   if (!st->use_rast_y_flip && st_fb_orientation(ctx->DrawBuffer) == Y_0_TOP) {
       /* Drawing to a window.  The corresponding gallium surface uses
        * Y=0=TOP but OpenGL is Y=0=BOTTOM.  So we need to invert the viewport.
        */

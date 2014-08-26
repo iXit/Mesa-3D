@@ -113,6 +113,7 @@ struct pipe_rasterizer_state
    unsigned flatshade_first:1;
 
    unsigned half_pixel_center:1;
+   unsigned lower_left_origin:1;
    unsigned bottom_edge_rule:1;
 
    /**

@@ -240,6 +240,9 @@ st_create_context_priv( struct gl_context *ctx, struct pipe_context *pipe,
    st->has_time_elapsed =
       screen->get_param(screen, PIPE_CAP_QUERY_TIME_ELAPSED);
 
+   st->use_rast_y_flip =
+      screen->get_param(screen, PIPE_CAP_RASTERIZER_LOWER_LEFT_ORIGIN);
+
    /* GL limits and extensions */
    st_init_limits(st->pipe->screen, &ctx->Const, &ctx->Extensions);
    st_init_extensions(st->pipe->screen, &ctx->Const,

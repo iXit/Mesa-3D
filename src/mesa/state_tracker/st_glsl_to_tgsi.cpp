@@ -4156,6 +4156,8 @@ struct st_translate {
 
    unsigned procType;  /**< TGSI_PROCESSOR_VERTEX/FRAGMENT */
 
+   boolean fs_coord_y_flip; /* whether to apply STATE_FB_WPOS_Y_TRANSFORM */
+
    boolean error;
 };
 
@@ -4655,7 +4657,7 @@ emit_wpos_adjustment( struct st_translate *t,
                 wpos_input,
                 ureg_scalar(wpostrans, 0),
                 ureg_scalar(wpostrans, 1));
-   } else {
+   } else if (t->fs_coord_y_flip) {
       /* MAD wpos_temp.y, wpos_input, wpostrans.zzzz, wpostrans.wwww
        */
       ureg_MAD( ureg,
@@ -4743,7 +4745,7 @@ emit_wpos(struct st_context *st,
       /* Fragment shader wants pixel center integer */
       if (pscreen->get_param(pscreen, PIPE_CAP_TGSI_FS_COORD_PIXEL_CENTER_INTEGER)) {
          /* the driver supports pixel center integer */
-         adjY[1] = 1.0f;
+         adjY[1] = (float)t->fs_coord_y_flip;
          ureg_property_fs_coord_pixel_center(ureg, TGSI_FS_COORD_PIXEL_CENTER_INTEGER);
       }
       else if (pscreen->get_param(pscreen, PIPE_CAP_TGSI_FS_COORD_PIXEL_CENTER_HALF_INTEGER)) {
@@ -4879,6 +4881,7 @@ st_translate_program(
    t->inputMapping = inputMapping;
    t->outputMapping = outputMapping;
    t->ureg = ureg;
+   t->fs_coord_y_flip = !st_context(ctx)->use_rast_y_flip;
 
    if (program->shader_program) {
       for (i = 0; i < program->shader_program->NumUserUniformStorage; i++) {

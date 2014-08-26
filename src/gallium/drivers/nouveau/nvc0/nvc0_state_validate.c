@@ -4,6 +4,35 @@
 #include "nvc0/nvc0_context.h"
 #include "nv50/nv50_defs.xml.h"
 
+static INLINE void
+nvc0_validate_api_settings(struct nvc0_context *nvc0)
+{
+   struct nouveau_pushbuf *push = nvc0->base.pushbuf;
+   uint8_t m;
+   const uint8_t api = nvc0->rast->api;
+
+   m = api ^ nvc0->state.rasterizer_api;
+   if (nvc0->dirty & NVC0_NEW_FRAMEBUFFER)
+      m |= ~api & 0x2; /* only if we have to update y offset */
+
+   nvc0->state.rasterizer_api = api;
+
+   if (m & ~0x2) {
+      IMMED_NVC0(push, NVC0_3D(PIXEL_CENTER_INTEGER), !!(api & 0x1));
+      IMMED_NVC0(push, NVC0_3D(DEPTH_CLIP_NEGATIVE_Z), !!(api & 0x4));
+      /* switch point rasterization rules to D3D if settings look like D3D */
+      IMMED_NVC0(push, NVC0_3D(POINT_RASTER_RULES), !!(api & 0x4) &&
+                 nvc0->rast->pipe.point_quad_rasterization);
+   }
+   if (m & 0x2) { /* fb height or origin changed */
+      const uint8_t mode = (nvc0->rast->api & 0x2) ?
+         0 : NVC0_3D_SCREEN_Y_CONTROL_Y_NEGATE;
+      IMMED_NVC0(push, NVC0_3D(SCREEN_Y_CONTROL), mode);
+      BEGIN_NVC0(push, NVC0_3D(WINDOW_OFFSET_Y), 1);
+      PUSH_DATA (push, (nvc0->rast->api & 0x2) ? 0 : nvc0->framebuffer.height);
+   }
+}
+
 #if 0
 static void
 nvc0_validate_zcull(struct nvc0_context *nvc0)
@@ -76,13 +105,18 @@ nvc0_validate_fb(struct nvc0_context *nvc0)
     unsigned ms_mode = NVC0_3D_MULTISAMPLE_MODE_MS1;
     boolean serialize = FALSE;
 
+    nvc0_validate_api_settings(nvc0); /* depends on rasterizer */
+
+    if (!(nvc0->dirty & NVC0_NEW_FRAMEBUFFER))
+      return;
     nouveau_bufctx_reset(nvc0->bufctx_3d, NVC0_BIND_FB);
 
-    BEGIN_NVC0(push, NVC0_3D(RT_CONTROL), 1);
-    PUSH_DATA (push, (076543210 << 4) | fb->nr_cbufs);
     BEGIN_NVC0(push, NVC0_3D(SCREEN_SCISSOR_HORIZ), 2);
     PUSH_DATA (push, fb->width << 16);
     PUSH_DATA (push, fb->height << 16);
+
+    BEGIN_NVC0(push, NVC0_3D(RT_CONTROL), 1);
+    PUSH_DATA (push, (076543210 << 4) | fb->nr_cbufs);
 
     for (i = 0; i < fb->nr_cbufs; ++i) {
         struct nv50_surface *sf;
@@ -143,6 +177,11 @@ nvc0_validate_fb(struct nvc0_context *nvc0)
         /* only register for writing, otherwise we'd always serialize here */
         BCTX_REFN(nvc0->bufctx_3d, FB, res, WR);
     }
+    if (unlikely(!fb->nr_cbufs && nvc0->zsa->pipe.alpha.enabled)) {
+       /* need RT_COUNT >= 1 to make alpha test work */
+       IMMED_NVC0(push, NVC0_3D(RT_CONTROL), 1);
+       nvc0_fb_set_null_rt(push, 0);
+    }
 
     if (fb->zsbuf) {
         struct nv50_miptree *mt = nv50_miptree(fb->zsbuf->texture);
@@ -200,7 +239,7 @@ nvc0_validate_fb(struct nvc0_context *nvc0)
     NOUVEAU_DRV_STAT(&nvc0->screen->base, gpu_serialize_count, serialize);
 }
 
-static void
+static INLINE void
 nvc0_validate_blend_colour(struct nvc0_context *nvc0)
 {
    struct nouveau_pushbuf *push = nvc0->base.pushbuf;
@@ -212,7 +251,7 @@ nvc0_validate_blend_colour(struct nvc0_context *nvc0)
    PUSH_DATAf(push, nvc0->blend_colour.color[3]);
 }
 
-static void
+static INLINE void
 nvc0_validate_stencil_ref(struct nvc0_context *nvc0)
 {
     struct nouveau_pushbuf *push = nvc0->base.pushbuf;
@@ -222,7 +261,7 @@ nvc0_validate_stencil_ref(struct nvc0_context *nvc0)
     IMMED_NVC0(push, NVC0_3D(STENCIL_BACK_FUNC_REF), ref[1]);
 }
 
-static void
+static INLINE void
 nvc0_validate_stipple(struct nvc0_context *nvc0)
 {
     struct nouveau_pushbuf *push = nvc0->base.pushbuf;
@@ -385,6 +424,52 @@ nvc0_validate_clip(struct nvc0_context *nvc0)
 }
 
 static void
+nvc0_validate_derived_aux_constants(struct nvc0_context *nvc0)
+{
+   struct nouveau_pushbuf *push = nvc0->base.pushbuf;
+   struct nouveau_bo *bo = nvc0->screen->uniform_bo;
+   float ys, yt, xt;
+   uint8_t frag_coord_mode;
+
+   if (!nvc0->fragprog ||
+       !(nvc0->fragprog->hdr[5] & (0x3 << 28)) || /* FRAG_COORD_UMASK.xy */
+       !nvc0->rast)
+      return;
+   /* NOTE: FB Y flip probably does affect FragCoord */
+   frag_coord_mode = nvc0->rast->api & 0x3;
+
+   xt = 0.0f;
+   ys = 1.0f;
+   yt = 0.0f;
+   switch (frag_coord_mode ^ nvc0->fragprog->fp.frag_coord_mode) {
+   case 0x1: /* center shift only */
+      xt = (frag_coord_mode & 1) ? +0.5f : -0.5f;
+      yt = xt;
+      break;
+   case 0x2: /* inversion only */
+      ys = -1.0f;
+      yt = (float)nvc0->framebuffer.height - (float)(frag_coord_mode & 1);
+      break;
+   case 0x3: /* inversion and center shift */
+      xt = (frag_coord_mode & 1) ? +0.5f : -0.5f;
+      ys = -1.0f;
+      yt = (float)nvc0->framebuffer.height - 0.5f;
+      break;
+   default:
+      break;
+   }
+   BEGIN_NVC0(push, NVC0_3D(CB_SIZE), 3);
+   PUSH_DATA (push, NVC0_CB_AUX_SIZE);
+   PUSH_DATAh(push, bo->offset + NVC0_CB_AUX_BASE(4));
+   PUSH_DATA (push, bo->offset + NVC0_CB_AUX_BASE(4));
+   BEGIN_1IC0(push, NVC0_3D(CB_POS), 1 + 3);
+   PUSH_DATA (push, NVC0_CB_AUX_FCOORD_ADJ_OFFSET);
+   PUSH_DATAf(push, ys); /* FragCoord.y scale */
+   PUSH_DATAf(push, yt); /* FragCoord.y translate */
+   PUSH_DATAf(push, xt); /* FragCoord.x adjust */
+}
+
+static void
 nvc0_validate_blend(struct nvc0_context *nvc0)
 {
    struct nouveau_pushbuf *push = nvc0->base.pushbuf;
@@ -400,6 +485,16 @@ nvc0_validate_zsa(struct nvc0_context *nvc0)
 
    PUSH_SPACE(push, nvc0->zsa->size);
    PUSH_DATAp(push, nvc0->zsa->state, nvc0->zsa->size);
+
+   if (!(nvc0->dirty & NVC0_NEW_FRAMEBUFFER) && !nvc0->framebuffer.nr_cbufs) {
+      if (nvc0->zsa->pipe.alpha.enabled) {
+         /* need RT_COUNT >= 1 to make alpha test work */
+         IMMED_NVC0(push, NVC0_3D(RT_CONTROL), 1);
+         nvc0_fb_set_null_rt(push, 0);
+      } else {
+         IMMED_NVC0(push, NVC0_3D(RT_CONTROL), 0);
+      }
+   }
 }
 
 static void
@@ -466,7 +561,7 @@ nvc0_constbufs_validate(struct nvc0_context *nvc0)
    }
 }
 
-static void
+static INLINE void
 nvc0_validate_sample_mask(struct nvc0_context *nvc0)
 {
    struct nouveau_pushbuf *push = nvc0->base.pushbuf;
@@ -515,6 +610,16 @@ nvc0_validate_global_residents(struct nvc0_context *nvc0,
 }
 
 static void
+nvc0_validate_shaders(struct nvc0_context *nvc0)
+{
+   if (nvc0->dirty & NVC0_NEW_VERTPROG) nvc0_vertprog_validate(nvc0);
+   if (nvc0->dirty & NVC0_NEW_TCTLPROG) nvc0_tctlprog_validate(nvc0);
+   if (nvc0->dirty & NVC0_NEW_TEVLPROG) nvc0_tevlprog_validate(nvc0);
+   if (nvc0->dirty & NVC0_NEW_GMTYPROG) nvc0_gmtyprog_validate(nvc0);
+   if (nvc0->dirty & NVC0_NEW_FRAGPROG) nvc0_fragprog_validate(nvc0);
+}
+
+static void
 nvc0_validate_derived_1(struct nvc0_context *nvc0)
 {
    struct nouveau_pushbuf *push = nvc0->base.pushbuf;
@@ -533,6 +638,28 @@ nvc0_validate_derived_1(struct nvc0_context *nvc0)
       nvc0->state.rasterizer_discard = rasterizer_discard;
       IMMED_NVC0(push, NVC0_3D(RASTERIZE_ENABLE), !rasterizer_discard);
    }
+
+   if (nvc0->dirty & (NVC0_NEW_FRAMEBUFFER |
+                      NVC0_NEW_FRAGPROG |
+                      NVC0_NEW_RASTERIZER))
+      nvc0_validate_derived_aux_constants(nvc0);
+}
+
+static void
+nvc0_validate_misc_values(struct nvc0_context *nvc0)
+{
+   if (nvc0->dirty & NVC0_NEW_SAMPLE_MASK)
+      nvc0_validate_sample_mask(nvc0);
+
+   if (nvc0->dirty & NVC0_NEW_BLEND_COLOUR)
+      nvc0_validate_blend_colour(nvc0);
+
+   if (nvc0->dirty & NVC0_NEW_STENCIL_REF)
+      nvc0_validate_stencil_ref(nvc0);
+
+   /* unlikely because deprecated */
+   if (unlikely(nvc0->dirty & NVC0_NEW_STIPPLE))
+      nvc0_validate_stipple(nvc0);
 }
 
 static void
@@ -578,22 +705,23 @@ static struct state_validate {
     void (*func)(struct nvc0_context *);
     uint32_t states;
 } validate_list[] = {
-    { nvc0_validate_fb,            NVC0_NEW_FRAMEBUFFER },
-    { nvc0_validate_blend,         NVC0_NEW_BLEND },
+    { nvc0_validate_fb,            NVC0_NEW_FRAMEBUFFER | NVC0_NEW_RASTERIZER },
     { nvc0_validate_zsa,           NVC0_NEW_ZSA },
-    { nvc0_validate_sample_mask,   NVC0_NEW_SAMPLE_MASK },
+    { nvc0_validate_blend,         NVC0_NEW_BLEND },
     { nvc0_validate_rasterizer,    NVC0_NEW_RASTERIZER },
-    { nvc0_validate_blend_colour,  NVC0_NEW_BLEND_COLOUR },
-    { nvc0_validate_stencil_ref,   NVC0_NEW_STENCIL_REF },
-    { nvc0_validate_stipple,       NVC0_NEW_STIPPLE },
+    { nvc0_validate_misc_values,   NVC0_NEW_SAMPLE_MASK |
+                                   NVC0_NEW_BLEND_COLOUR |
+                                   NVC0_NEW_STENCIL_REF |
+                                   NVC0_NEW_STIPPLE },
     { nvc0_validate_scissor,       NVC0_NEW_SCISSOR | NVC0_NEW_RASTERIZER },
     { nvc0_validate_viewport,      NVC0_NEW_VIEWPORT },
-    { nvc0_vertprog_validate,      NVC0_NEW_VERTPROG },
-    { nvc0_tctlprog_validate,      NVC0_NEW_TCTLPROG },
-    { nvc0_tevlprog_validate,      NVC0_NEW_TEVLPROG },
-    { nvc0_gmtyprog_validate,      NVC0_NEW_GMTYPROG },
-    { nvc0_fragprog_validate,      NVC0_NEW_FRAGPROG },
-    { nvc0_validate_derived_1,     NVC0_NEW_FRAGPROG | NVC0_NEW_ZSA |
+    { nvc0_validate_shaders,       NVC0_NEW_VERTPROG |
+                                   NVC0_NEW_TCTLPROG |
+                                   NVC0_NEW_TEVLPROG |
+                                   NVC0_NEW_GMTYPROG |
+                                   NVC0_NEW_FRAGPROG },
+    { nvc0_validate_derived_1,     NVC0_NEW_FRAMEBUFFER |
+                                   NVC0_NEW_FRAGPROG | NVC0_NEW_ZSA |
                                    NVC0_NEW_RASTERIZER },
     { nvc0_validate_clip,          NVC0_NEW_CLIP | NVC0_NEW_RASTERIZER |
                                    NVC0_NEW_VERTPROG |

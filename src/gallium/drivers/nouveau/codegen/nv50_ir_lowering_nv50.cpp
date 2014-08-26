@@ -674,7 +674,7 @@ void NV50LoweringPreSSA::loadTexMsInfo(uint32_t off, Value **ms,
 
 void NV50LoweringPreSSA::loadMsInfo(Value *ms, Value *s, Value **dx, Value **dy) {
    // Given a MS level, and a sample id, compute the delta x/y
-   uint8_t b = prog->driver->io.msInfoCBSlot;
+   uint8_t b = prog->driver->io.auxCBSlot;
    Value *off = new_LValue(func, FILE_ADDRESS), *t = new_LValue(func, FILE_GPR);
 
    // The required information is at mslevel * 16 * 4 + sample * 8

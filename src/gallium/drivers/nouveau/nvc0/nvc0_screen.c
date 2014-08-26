@@ -150,6 +150,9 @@ nvc0_screen_get_param(struct pipe_screen *pscreen, enum pipe_cap param)
    case PIPE_CAP_INDEP_BLEND_FUNC:
    case PIPE_CAP_TGSI_FS_COORD_ORIGIN_UPPER_LEFT:
    case PIPE_CAP_TGSI_FS_COORD_PIXEL_CENTER_HALF_INTEGER:
+   case PIPE_CAP_TGSI_FS_COORD_PIXEL_CENTER_INTEGER:
+   case PIPE_CAP_TGSI_FS_COORD_ORIGIN_LOWER_LEFT:
+   case PIPE_CAP_RASTERIZER_LOWER_LEFT_ORIGIN:
    case PIPE_CAP_PRIMITIVE_RESTART:
    case PIPE_CAP_TGSI_INSTANCEID:
    case PIPE_CAP_VERTEX_ELEMENT_INSTANCE_DIVISOR:
@@ -178,8 +181,6 @@ nvc0_screen_get_param(struct pipe_screen *pscreen, enum pipe_cap param)
       return (class_3d == NVE4_3D_CLASS) ? 1 : 0;
 
    /* unsupported caps */
-   case PIPE_CAP_TGSI_FS_COORD_ORIGIN_LOWER_LEFT:
-   case PIPE_CAP_TGSI_FS_COORD_PIXEL_CENTER_INTEGER:
    case PIPE_CAP_SHADER_STENCIL_EXPORT:
    case PIPE_CAP_TGSI_CAN_COMPACT_CONSTANTS:
    case PIPE_CAP_VERTEX_BUFFER_OFFSET_4BYTE_ALIGNED_ONLY:
@@ -786,8 +787,6 @@ nvc0_screen_create(struct nouveau_device *dev)
    PUSH_DATA (push, 0);
    BEGIN_NVC0(push, NVC0_3D(LINE_WIDTH_SEPARATE), 1);
    PUSH_DATA (push, 1);
-   BEGIN_NVC0(push, NVC0_3D(LINE_LAST_PIXEL), 1);
-   PUSH_DATA (push, 0);
    BEGIN_NVC0(push, NVC0_3D(PRIM_RESTART_WITH_DRAW_ARRAYS), 1);
    PUSH_DATA (push, 1);
    BEGIN_NVC0(push, NVC0_3D(BLEND_SEPARATE_ALPHA), 1);
@@ -833,9 +832,9 @@ nvc0_screen_create(struct nouveau_device *dev)
       /* TIC and TSC entries for each unit (nve4+ only) */
       /* auxiliary constants (6 user clip planes, base instance id) */
       BEGIN_NVC0(push, NVC0_3D(CB_SIZE), 3);
-      PUSH_DATA (push, 512);
-      PUSH_DATAh(push, screen->uniform_bo->offset + (5 << 16) + (i << 9));
-      PUSH_DATA (push, screen->uniform_bo->offset + (5 << 16) + (i << 9));
+      PUSH_DATA (push, NVC0_CB_AUX_SIZE);
+      PUSH_DATAh(push, screen->uniform_bo->offset + NVC0_CB_AUX_BASE(i));
+      PUSH_DATA (push, screen->uniform_bo->offset + NVC0_CB_AUX_BASE(i));
       BEGIN_NVC0(push, NVC0_3D(CB_BIND(i)), 1);
       PUSH_DATA (push, (15 << 4) | 1);
       if (screen->eng3d->oclass >= NVE4_3D_CLASS) {
@@ -946,6 +945,8 @@ nvc0_screen_create(struct nouveau_device *dev)
    BEGIN_NVC0(push, NVC0_3D(CLEAR_FLAGS), 1);
    PUSH_DATA (push, 0);
 
+   BEGIN_NVC0(push, NVC0_3D(PIXEL_CENTER_INTEGER), 1);
+   PUSH_DATA (push, 0);
    BEGIN_NVC0(push, NVC0_3D(VIEWPORT_TRANSFORM_EN), 1);
    PUSH_DATA (push, 1);
    for (i = 0; i < NVC0_MAX_VIEWPORTS; i++) {

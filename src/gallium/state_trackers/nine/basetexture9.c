@@ -430,8 +430,11 @@ NineBaseTexture9_UpdateSamplerView( struct NineBaseTexture9 *This,
     struct pipe_sampler_view templ;
     uint8_t swizzle[4];
 
-    if (!resource)
+    if (unlikely(!resource)) {
+	if (unlikely(This->format == D3DFMT_NULL))
+            return D3D_OK;
         NineBaseTexture9_Dump(This);
+    }
     assert(resource);
 
     pipe_sampler_view_reference(&This->view[sRGB], NULL);

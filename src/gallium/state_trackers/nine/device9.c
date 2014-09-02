@@ -227,15 +227,16 @@ NineDevice9_ctor( struct NineDevice9 *This,
     /* Create constant buffers. */
     {
         struct pipe_resource tmpl;
-        unsigned max_const_vs, max_const_ps, max_const_f_vs, max_const_f_ps;
+        unsigned max_const_vs, max_const_ps;
 
-        max_const_vs = pScreen->get_shader_param(pScreen, PIPE_SHADER_VERTEX,
-                                                 PIPE_SHADER_CAP_MAX_CONST_BUFFER_SIZE);
-        max_const_ps = pScreen->get_shader_param(pScreen, PIPE_SHADER_FRAGMENT,
-                                                 PIPE_SHADER_CAP_MAX_CONST_BUFFER_SIZE);
-
-        max_const_f_vs = max_const_vs = MIN2(max_const_vs, NINE_MAX_CONST_ALL);
-        max_const_f_ps = max_const_ps = MIN2(max_const_ps, NINE_MAX_CONST_ALL);
+        max_const_vs = _min(pScreen->get_shader_param(pScreen, PIPE_SHADER_VERTEX,
+                                PIPE_SHADER_CAP_MAX_CONST_BUFFER_SIZE) /
+                                sizeof(float[4]),
+			    NINE_MAX_CONST_ALL);
+        max_const_ps = _min(pScreen->get_shader_param(pScreen, PIPE_SHADER_FRAGMENT,
+                                PIPE_SHADER_CAP_MAX_CONST_BUFFER_SIZE) /
+                                sizeof(float[4]),
+                            NINE_MAX_CONST_ALL);
 
         if (max_const_vs < NINE_MAX_CONST_ALL ||
             max_const_ps < NINE_MAX_CONST_ALL) {
@@ -243,15 +244,15 @@ NineDevice9_ctor( struct NineDevice9 *This,
                 "Driver does not support NINE_MAX_CONST_ALL uniforms !\n");
             return D3DERR_DRIVERINTERNALERROR;
         }
-        max_const_f_vs -= NINE_MAX_CONST_I + NINE_MAX_CONST_B / 4;
-        max_const_f_ps -= NINE_MAX_CONST_I + NINE_MAX_CONST_B / 4;
 
-        This->max_vs_const_f = max_const_f_vs;
-        This->max_ps_const_f = max_const_f_ps;
+        This->max_vs_const_f = max_const_vs -
+                               (NINE_MAX_CONST_I + NINE_MAX_CONST_B / 4);
+        This->max_ps_const_f = max_const_ps -
+                               (NINE_MAX_CONST_I + NINE_MAX_CONST_B / 4);
 
         /* Include space for I,B constants for user constbuf. */
-        This->state.vs_const_f = CALLOC(max_const_vs, 4 * sizeof(float));
-        This->state.ps_const_f = CALLOC(max_const_ps, 4 * sizeof(float));
+        This->state.vs_const_f = CALLOC(max_const_vs, sizeof(float[4]));
+        This->state.ps_const_f = CALLOC(max_const_ps, sizeof(float[4]));
         if (!This->state.vs_const_f || !This->state.ps_const_f)
             return E_OUTOFMEMORY;
 
@@ -270,10 +271,10 @@ NineDevice9_ctor( struct NineDevice9 *This,
         tmpl.bind = PIPE_BIND_CONSTANT_BUFFER;
         tmpl.flags = 0;
 
-        tmpl.width0 = max_const_vs * 16;
+        tmpl.width0 = max_const_vs * sizeof(float[4]);
         This->constbuf_vs = pScreen->resource_create(pScreen, &tmpl);
 
-        tmpl.width0 = max_const_ps * 16;
+        tmpl.width0 = max_const_ps * sizeof(float[4]);
         This->constbuf_ps = pScreen->resource_create(pScreen, &tmpl);
 
         if (!This->constbuf_vs || !This->constbuf_ps)

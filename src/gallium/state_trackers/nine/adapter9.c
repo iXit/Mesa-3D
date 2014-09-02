@@ -754,10 +754,10 @@ NineAdapter9_GetDeviceCaps( struct NineAdapter9 *This,
 
     pCaps->MaxPrimitiveCount = 0xFFFFF; /* <- wine, really 0xFFFFFFFF; */
     pCaps->MaxVertexIndex = 0xFFFFF; /* <- wine, really 0xFFFFFFFF */
-    pCaps->MaxStreams = screen->get_shader_param(screen,
-        PIPE_SHADER_VERTEX, PIPE_SHADER_CAP_MAX_INPUTS);
-    if (pCaps->MaxStreams > 16)
-        pCaps->MaxStreams = 16;
+    pCaps->MaxStreams =
+        _min(screen->get_shader_param(screen,
+                 PIPE_SHADER_VERTEX, PIPE_SHADER_CAP_MAX_INPUTS),
+             16);
 
     pCaps->MaxStreamStride = 0xFFFF; /* NV50 */
 
@@ -770,10 +770,10 @@ NineAdapter9_GetDeviceCaps( struct NineAdapter9 *This,
          * into 20 float vectors (16 for i# and 16/4 for b#), since gallium has
          * removed support for the loop counter/boolean files. */
         pCaps->MaxVertexShaderConst =
-            screen->get_shader_param(screen, PIPE_SHADER_VERTEX,
-                                     PIPE_SHADER_CAP_MAX_CONST_BUFFER_SIZE) - 20;
-        if (pCaps->MaxVertexShaderConst > NINE_MAX_CONST_F)
-            pCaps->MaxVertexShaderConst = NINE_MAX_CONST_F;
+            _min((screen->get_shader_param(screen, PIPE_SHADER_VERTEX,
+                     PIPE_SHADER_CAP_MAX_CONST_BUFFER_SIZE) /
+                     sizeof(float[4])) - 20,
+		 NINE_MAX_CONST_F);
         /* Fake the minimum cap for Windows. */
         if (QUIRK(FAKE_CAPS)) {
             pCaps->MaxVertexShaderConst = 256;

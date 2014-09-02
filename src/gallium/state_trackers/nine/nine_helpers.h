@@ -26,6 +26,17 @@
 #include "iunknown.h"
 #include "nine_lock.h"
 
+/*
+ * Note: we use these function rather than the MIN2, MAX2, CLAMP macros to
+ * avoid evaluating arguments (which are often function calls) more than once.
+ */
+
+static inline unsigned _min(unsigned a, unsigned b)
+{
+   return (a < b) ? a : b;
+}
+
+
 /* Sshhh ... */
 #define nine_reference(a, b) _nine_reference((void **)(a), (b))
 

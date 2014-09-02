@@ -759,7 +759,8 @@ NineAdapter9_GetDeviceCaps( struct NineAdapter9 *This,
                  PIPE_SHADER_VERTEX, PIPE_SHADER_CAP_MAX_INPUTS),
              16);
 
-    pCaps->MaxStreamStride = 0xFFFF; /* NV50 */
+    pCaps->MaxStreamStride = screen->get_param(screen,
+            PIPE_CAP_MAX_VERTEX_ATTRIB_STRIDE);
 
     pCaps->VertexShaderVersion = sm3 ? D3DVS_VERSION(3,0) : D3DVS_VERSION(2,0);
     if (vs) {

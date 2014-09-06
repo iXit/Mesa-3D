@@ -238,21 +238,14 @@ NineDevice9_ctor( struct NineDevice9 *This,
                                 sizeof(float[4]),
                             NINE_MAX_CONST_ALL);
 
-        if (max_const_vs < NINE_MAX_CONST_ALL ||
-            max_const_ps < NINE_MAX_CONST_ALL) {
-            DBG("FIXME: "
-                "Driver does not support NINE_MAX_CONST_ALL uniforms !\n");
-            return D3DERR_DRIVERINTERNALERROR;
-        }
-
         This->max_vs_const_f = max_const_vs -
                                (NINE_MAX_CONST_I + NINE_MAX_CONST_B / 4);
         This->max_ps_const_f = max_const_ps -
                                (NINE_MAX_CONST_I + NINE_MAX_CONST_B / 4);
 
         /* Include space for I,B constants for user constbuf. */
-        This->state.vs_const_f = CALLOC(max_const_vs, sizeof(float[4]));
-        This->state.ps_const_f = CALLOC(max_const_ps, sizeof(float[4]));
+        This->state.vs_const_f = CALLOC(NINE_MAX_CONST_ALL, sizeof(float[4]));
+        This->state.ps_const_f = CALLOC(NINE_MAX_CONST_ALL, sizeof(float[4]));
         if (!This->state.vs_const_f || !This->state.ps_const_f)
             return E_OUTOFMEMORY;
 

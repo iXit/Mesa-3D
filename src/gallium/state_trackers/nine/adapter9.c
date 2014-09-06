@@ -895,18 +895,23 @@ NineAdapter9_GetDeviceCaps( struct NineAdapter9 *This,
     else
         pCaps->VertexTextureFilterCaps = 0;
 
-    pCaps->MaxVertexShader30InstructionSlots =
-        sm3 ? screen->get_shader_param(screen, PIPE_SHADER_VERTEX,
-                                       PIPE_SHADER_CAP_MAX_INSTRUCTIONS) : 0;
-    pCaps->MaxPixelShader30InstructionSlots =
-        sm3 ? screen->get_shader_param(screen, PIPE_SHADER_FRAGMENT,
-                                       PIPE_SHADER_CAP_MAX_INSTRUCTIONS) : 0;
-    if (pCaps->MaxVertexShader30InstructionSlots > D3DMAX30SHADERINSTRUCTIONS)
-        pCaps->MaxVertexShader30InstructionSlots = D3DMAX30SHADERINSTRUCTIONS;
-    if (pCaps->MaxPixelShader30InstructionSlots > D3DMAX30SHADERINSTRUCTIONS)
-        pCaps->MaxPixelShader30InstructionSlots = D3DMAX30SHADERINSTRUCTIONS;
-    assert(pCaps->MaxVertexShader30InstructionSlots >= D3DMIN30SHADERINSTRUCTIONS);
-    assert(pCaps->MaxPixelShader30InstructionSlots >= D3DMIN30SHADERINSTRUCTIONS);
+    if (sm3) {
+        pCaps->MaxVertexShader30InstructionSlots =
+            screen->get_shader_param(screen, PIPE_SHADER_VERTEX,
+                                     PIPE_SHADER_CAP_MAX_INSTRUCTIONS);
+        pCaps->MaxPixelShader30InstructionSlots =
+            screen->get_shader_param(screen, PIPE_SHADER_FRAGMENT,
+                                     PIPE_SHADER_CAP_MAX_INSTRUCTIONS);
+        if (pCaps->MaxVertexShader30InstructionSlots > D3DMAX30SHADERINSTRUCTIONS)
+            pCaps->MaxVertexShader30InstructionSlots = D3DMAX30SHADERINSTRUCTIONS;
+        if (pCaps->MaxPixelShader30InstructionSlots > D3DMAX30SHADERINSTRUCTIONS)
+            pCaps->MaxPixelShader30InstructionSlots = D3DMAX30SHADERINSTRUCTIONS;
+        assert(pCaps->MaxVertexShader30InstructionSlots >= D3DMIN30SHADERINSTRUCTIONS);
+        assert(pCaps->MaxPixelShader30InstructionSlots >= D3DMIN30SHADERINSTRUCTIONS);
+    } else {
+        pCaps->MaxVertexShader30InstructionSlots = 0;
+        pCaps->MaxPixelShader30InstructionSlots = 0;
+    }
 
     /* 65535 is required, advertise more for GPUs with >= 2048 instruction slots */
     pCaps->MaxVShaderInstructionsExecuted = MAX2(65535, pCaps->MaxVertexShader30InstructionSlots * 32);

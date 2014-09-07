@@ -1017,6 +1017,7 @@ ps_do_ts_op(struct ps_build_ctx *ps, unsigned top, struct ureg_dst dst, struct u
 {
     struct ureg_program *ureg = ps->ureg;
     struct ureg_dst tmp = ps->r[ps->stage.num_regs];
+    struct ureg_dst tmp2 = ps->r[ps->stage.num_regs+1];
     struct ureg_dst tmp_x = ureg_writemask(tmp, TGSI_WRITEMASK_X);
 
     tmp.WriteMask = dst.WriteMask;
@@ -1107,7 +1108,10 @@ ps_do_ts_op(struct ps_build_ctx *ps, unsigned top, struct ureg_dst dst, struct u
     case D3DTOP_BUMPENVMAPLUMINANCE:
         break;
     case D3DTOP_DOTPRODUCT3:
-        ureg_DP3(ureg, dst, arg[1], arg[2]);
+        ureg_SUB(ureg, tmp, arg[1], ureg_imm4f(ureg,0.5,0.5,0.5,0.5));
+        ureg_SUB(ureg, tmp2, arg[2] , ureg_imm4f(ureg,0.5,0.5,0.5,0.5));
+        ureg_DP3(ureg, tmp, ureg_src(tmp), ureg_src(tmp2));
+        ureg_MUL(ureg, ureg_saturate(dst), ureg_src(tmp), ureg_imm4f(ureg,4.0,4.0,4.0,4.0));
         break;
     case D3DTOP_MULTIPLYADD:
         ureg_MAD(ureg, dst, arg[2], arg[0], arg[1]);

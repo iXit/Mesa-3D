@@ -82,7 +82,7 @@ else # HAVE_GALLIUM_STATIC_TARGETS
 
 libomx_mesa_la_CPPFLAGS = \
 	$(GALLIUM_PIPE_LOADER_DEFINES) \
-	-DPIPE_SEARCH_DIR=\"$(libdir)/gallium-pipe\"
+	-DPIPE_SEARCH_DIR=\"$(GALLIUM_PIPE_LOADER_DIR)\"
 
 # XXX: Use the pipe-loader-client over pipe-loader ?
 libomx_mesa_la_LIBADD += \

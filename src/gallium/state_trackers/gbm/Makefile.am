@@ -31,7 +31,7 @@ AM_CFLAGS = \
 AM_CPPFLAGS = \
 	-I$(top_srcdir)/src/gbm/main \
 	$(GALLIUM_PIPE_LOADER_DEFINES) \
-	-DPIPE_SEARCH_DIR=\"$(libdir)/gallium-pipe\"
+	-DPIPE_SEARCH_DIR=\"$(GALLIUM_PIPE_LOADER_DIR)\"
 
 if HAVE_GALLIUM_STATIC_TARGETS
 AM_CPPFLAGS += \

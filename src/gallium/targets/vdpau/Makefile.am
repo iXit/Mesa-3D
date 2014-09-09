@@ -56,7 +56,7 @@ else # HAVE_GALLIUM_STATIC_TARGETS
 
 libvdpau_gallium_la_CPPFLAGS = \
 	$(GALLIUM_PIPE_LOADER_DEFINES) \
-	-DPIPE_SEARCH_DIR=\"$(libdir)/gallium-pipe\"
+	-DPIPE_SEARCH_DIR=\"$(GALLIUM_PIPE_LOADER_DIR)\"
 
 libvdpau_gallium_la_LIBADD += \
 	$(top_builddir)/src/gallium/auxiliary/pipe-loader/libpipe_loader.la \

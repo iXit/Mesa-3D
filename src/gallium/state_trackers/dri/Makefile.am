@@ -26,7 +26,7 @@ include $(top_srcdir)/src/gallium/Automake.inc
 
 AM_CPPFLAGS = \
 	$(GALLIUM_PIPE_LOADER_DEFINES) \
-	-DPIPE_SEARCH_DIR=\"$(libdir)/gallium-pipe\" \
+	-DPIPE_SEARCH_DIR=\"$(GALLIUM_PIPE_LOADER_DIR)\" \
 	-I$(top_srcdir)/include \
 	-I$(top_srcdir)/src/mapi \
 	-I$(top_srcdir)/src/mesa \

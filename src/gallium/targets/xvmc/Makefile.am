@@ -51,7 +51,7 @@ else # HAVE_GALLIUM_STATIC_TARGETS
 
 libXvMCgallium_la_CPPFLAGS = \
 	$(GALLIUM_PIPE_LOADER_DEFINES) \
-	-DPIPE_SEARCH_DIR=\"$(libdir)/gallium-pipe\"
+	-DPIPE_SEARCH_DIR=\"$(GALLIUM_PIPE_LOADER_DIR)\"
 
 # XXX: Use the pipe-loader-client over pipe-loader ?
 libXvMCgallium_la_LIBADD += \

@@ -862,10 +862,16 @@ void Source::scanProperty(const struct tgsi_full_property *prop)
       info->prop.fp.separateFragData = TRUE;
       break;
    case TGSI_PROPERTY_FS_COORD_ORIGIN:
-      if (prop->u[0].Data == TGSI_FS_COORD_ORIGIN_UPPER_LEFT)
-         info->prop.fp.fragCoordMode |=  (1 << 1);
-      else
-         info->prop.fp.fragCoordMode &= ~(1 << 1);
+      switch (prop->u[0].Data) {
+          case TGSI_FS_COORD_ORIGIN_UPPER_LEFT:
+	      info->prop.fp.fragCoordMode |=  (1 << 1);
+	      break;
+	  case TGSI_FS_COORD_ORIGIN_LOWER_LEFT:
+	      break;
+	  default:
+	      info->prop.fp.fragCoordMode &= ~(1 << 1);
+	      break;
+      }
       break;
    case TGSI_PROPERTY_FS_COORD_PIXEL_CENTER:
       if (prop->u[0].Data == TGSI_FS_COORD_PIXEL_CENTER_INTEGER)

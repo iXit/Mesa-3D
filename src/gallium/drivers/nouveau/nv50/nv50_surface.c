@@ -834,6 +834,7 @@ nv50_blit_select_mode(const struct pipe_blit_info *info)
          return NV50_BLIT_MODE_X24S8;
       }
    case PIPE_FORMAT_S8_UINT_Z24_UNORM:
+   case PIPE_FORMAT_X8Z24_UNORM:
       switch (mask & PIPE_MASK_ZS) {
       case PIPE_MASK_ZS: return NV50_BLIT_MODE_S8Z24;
       case PIPE_MASK_Z:  return NV50_BLIT_MODE_X8Z24;

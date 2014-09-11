@@ -111,6 +111,7 @@ nv50_blit_zeta_to_colour_format(enum pipe_format format)
    case PIPE_FORMAT_Z24_UNORM_S8_UINT:
    case PIPE_FORMAT_S8_UINT_Z24_UNORM:
    case PIPE_FORMAT_Z24X8_UNORM:
+   case PIPE_FORMAT_X8Z24_UNORM:
       return PIPE_FORMAT_R8G8B8A8_UNORM;
    case PIPE_FORMAT_Z32_FLOAT:
       return PIPE_FORMAT_R32_FLOAT;
@@ -127,23 +128,20 @@ static INLINE uint16_t
 nv50_blit_derive_color_mask(const struct pipe_blit_info *info)
 {
    const unsigned mask = info->mask;
-
    uint16_t color_mask = 0;
 
    switch (info->dst.format) {
    case PIPE_FORMAT_Z24_UNORM_S8_UINT:
-      if (mask & PIPE_MASK_S)
-         color_mask |= 0x1000;
+      if (mask & PIPE_MASK_S) color_mask |= 0x1000;
       /* fall through */
    case PIPE_FORMAT_Z24X8_UNORM:
-      if (mask & PIPE_MASK_Z)
-         color_mask |= 0x0111;
+      if (mask & PIPE_MASK_Z) color_mask |= 0x0111;
       break;
    case PIPE_FORMAT_S8_UINT_Z24_UNORM:
-      if (mask & PIPE_MASK_Z)
-         color_mask |= 0x1110;
-      if (mask & PIPE_MASK_S)
-         color_mask |= 0x0001;
+      if (mask & PIPE_MASK_S) color_mask |= 0x0001;
+      /* fall through */
+   case PIPE_FORMAT_X8Z24_UNORM:
+      if (mask & PIPE_MASK_Z) color_mask |= 0x1110;
       break;
    default:
       if (mask & (PIPE_MASK_R | PIPE_MASK_Z)) color_mask |= 0x0001;
@@ -152,7 +150,6 @@ nv50_blit_derive_color_mask(const struct pipe_blit_info *info)
       if (mask & PIPE_MASK_A) color_mask |= 0x1000;
       break;
    }
-
    return color_mask;
 }
 
@@ -163,15 +160,16 @@ nv50_blit_eng2d_get_mask(const struct pipe_blit_info *info)
 
    switch (info->dst.format) {
    case PIPE_FORMAT_Z24_UNORM_S8_UINT:
-      if (info->mask & PIPE_MASK_Z) mask |= 0x00ffffff;
       if (info->mask & PIPE_MASK_S) mask |= 0xff000000;
+      /* fall through */
+   case PIPE_FORMAT_Z24X8_UNORM:
+      if (info->mask & PIPE_MASK_Z) mask |= 0x00ffffff;
       break;
    case PIPE_FORMAT_S8_UINT_Z24_UNORM:
-      if (info->mask & PIPE_MASK_Z) mask |= 0xffffff00;
       if (info->mask & PIPE_MASK_S) mask |= 0x000000ff;
-      break;
+      /* fall through */
    case PIPE_FORMAT_X8Z24_UNORM:
-      if (info->mask & PIPE_MASK_Z) mask = 0x00ffffff;
+      if (info->mask & PIPE_MASK_Z) mask |= 0xffffff00;
       break;
    default:
       mask = 0xffffffff;

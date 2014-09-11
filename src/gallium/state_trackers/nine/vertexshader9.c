@@ -135,10 +135,13 @@ NineVertexShader9_GetVariant( struct NineVertexShader9 *This,
 {
     void *cso = nine_shader_variant_get(&This->variant, key);
     if (!cso) {
+        struct NineDevice9 *device = This->base.device;
         struct nine_shader_info info;
         HRESULT hr;
 
         info.type = PIPE_SHADER_VERTEX;
+        info.const_i_base = NINE_CONST_I_BASE(device->max_vs_const_f) / 16;
+        info.const_b_base = NINE_CONST_B_BASE(device->max_vs_const_f) / 16;
         info.byte_code = This->byte_code.tokens;
         info.sampler_mask_shadow = key & 0xf;
 

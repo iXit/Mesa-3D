@@ -24,6 +24,7 @@
 #include "device9.h"
 #include "nine_helpers.h"
 #include "nine_pipe.h"
+#include "nine_dump.h"
 
 #include "pipe/p_screen.h"
 #include "pipe/p_context.h"
@@ -41,6 +42,8 @@ NineIndexBuffer9_ctor( struct NineIndexBuffer9 *This,
 {
     struct pipe_resource *info = &This->base.info;
     HRESULT hr;
+    DBG("This=%p pParams=%p pDesc=%p Usage=%s\n",
+         This, pParams, pDesc, nine_D3DUSAGE_to_str(pDesc->Usage));
 
     This->pipe = pParams->device->pipe;
 
@@ -80,6 +83,8 @@ NineIndexBuffer9_ctor( struct NineIndexBuffer9 *This,
 
     This->buffer.buffer = This->base.resource;
     This->buffer.offset = 0;
+    This->map_count = 0;
+
     switch (pDesc->Format) {
     case D3DFMT_INDEX16: This->buffer.index_size = 2; break;
     case D3DFMT_INDEX32: This->buffer.index_size = 4; break;
@@ -118,10 +123,14 @@ NineIndexBuffer9_Lock( struct NineIndexBuffer9 *This,
 {
     struct pipe_box box;
     void *data;
+    UINT count;
     const unsigned usage = d3dlock_buffer_to_pipe_transfer_usage(Flags);
 
-    user_assert(!This->transfer, D3DERR_INVALIDCALL);
-    user_assert(ppbData, E_POINTER);
+    DBG("This=%p OffsetToLock=%u SizeToLock=%u ppbData=%p Flags=%i "
+        "transfer=%p map_count=%u\n", This, OffsetToLock,
+	SizeToLock, ppbData, Flags, This->transfer, This->map_count);
+
+    count = ++This->map_count;
 
     if (SizeToLock == 0) {
         SizeToLock = This->desc.Size - OffsetToLock;
@@ -130,6 +139,11 @@ NineIndexBuffer9_Lock( struct NineIndexBuffer9 *This,
 
     u_box_1d(OffsetToLock, SizeToLock, &box);
 
+    if (unlikely(count != 1)) {
+        DBG("Lock has been called on already locked buffer."
+	    "Unmapping before mapping again.");
+        This->pipe->transfer_unmap(This->pipe, This->transfer);
+    }
     data = This->pipe->transfer_map(This->pipe, This->base.resource, 0,
                                     usage, &box, &This->transfer);
     if (!This->transfer) {
@@ -138,12 +152,9 @@ NineIndexBuffer9_Lock( struct NineIndexBuffer9 *This,
             " box.x = %u\n"
             " box.width = %u\n",
             usage, box.x, box.width);
-        /* not sure what to return, msdn suggests this */
-        if (Flags & D3DLOCK_DONOTWAIT)
-            return D3DERR_WASSTILLDRAWING;
-        return D3DERR_INVALIDCALL;
     }
     *ppbData = data;
+    DBG("Returning memory at %p at address %p\n", *ppbData, ppbData);
 
     return D3D_OK;
 }
@@ -151,7 +162,15 @@ NineIndexBuffer9_Lock( struct NineIndexBuffer9 *This,
 HRESULT WINAPI
 NineIndexBuffer9_Unlock( struct NineIndexBuffer9 *This )
 {
-    user_assert(This->transfer, D3DERR_INVALIDCALL);
+    DBG("This=%p\n", This);
+    if (!This->map_count) {
+        DBG("Unmap called without a previous map call.\n");
+        return D3D_OK;
+    }
+    if (--This->map_count) {
+        DBG("Ignoring unmap.\n");
+	return D3D_OK;
+    }
     This->pipe->transfer_unmap(This->pipe, This->transfer);
     This->transfer = NULL;
     return D3D_OK;

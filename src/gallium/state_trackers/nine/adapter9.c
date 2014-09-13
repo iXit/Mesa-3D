@@ -836,9 +836,12 @@ NineAdapter9_GetDeviceCaps( struct NineAdapter9 *This,
         screen->get_shader_param(screen, PIPE_SHADER_VERTEX,
                                  PIPE_SHADER_CAP_MAX_CONTROL_FLOW_DEPTH);
 
-    if (pCaps->VS20Caps.DynamicFlowControlDepth > D3DVS20_MAX_DYNAMICFLOWCONTROLDEPTH)
+    /* also check for values < 0, because get_shader_param may return unsigned */
+    if (pCaps->VS20Caps.DynamicFlowControlDepth > D3DVS20_MAX_DYNAMICFLOWCONTROLDEPTH
+        || pCaps->VS20Caps.DynamicFlowControlDepth < 0)
         pCaps->VS20Caps.DynamicFlowControlDepth = D3DVS20_MAX_DYNAMICFLOWCONTROLDEPTH;
-    if (pCaps->VS20Caps.StaticFlowControlDepth > D3DVS20_MAX_STATICFLOWCONTROLDEPTH)
+    if (pCaps->VS20Caps.StaticFlowControlDepth > D3DVS20_MAX_STATICFLOWCONTROLDEPTH
+        || pCaps->VS20Caps.StaticFlowControlDepth < 0)
         pCaps->VS20Caps.StaticFlowControlDepth = D3DVS20_MAX_STATICFLOWCONTROLDEPTH;
     if (pCaps->VS20Caps.NumTemps > D3DVS20_MAX_NUMTEMPS)
         pCaps->VS20Caps.NumTemps = D3DVS20_MAX_NUMTEMPS;
@@ -862,7 +865,7 @@ NineAdapter9_GetDeviceCaps( struct NineAdapter9 *This,
         pCaps->PS20Caps.Caps |= D3DPS20CAPS_NODEPENDENTREADLIMIT;
     pCaps->PS20Caps.DynamicFlowControlDepth = /* XXX is this dynamic ? */
         screen->get_shader_param(screen, PIPE_SHADER_FRAGMENT,
-                                 PIPE_SHADER_CAP_MAX_CONTROL_FLOW_DEPTH);;
+                                 PIPE_SHADER_CAP_MAX_CONTROL_FLOW_DEPTH);
     pCaps->PS20Caps.NumTemps =
         screen->get_shader_param(screen, PIPE_SHADER_FRAGMENT,
                                  PIPE_SHADER_CAP_MAX_TEMPS);
@@ -873,9 +876,11 @@ NineAdapter9_GetDeviceCaps( struct NineAdapter9 *This,
         screen->get_shader_param(screen, PIPE_SHADER_FRAGMENT,
                                  PIPE_SHADER_CAP_MAX_INSTRUCTIONS);
 
-    if (pCaps->PS20Caps.DynamicFlowControlDepth > D3DPS20_MAX_DYNAMICFLOWCONTROLDEPTH)
+    if (pCaps->PS20Caps.DynamicFlowControlDepth > D3DPS20_MAX_DYNAMICFLOWCONTROLDEPTH
+        || pCaps->PS20Caps.DynamicFlowControlDepth < 0)
         pCaps->PS20Caps.DynamicFlowControlDepth = D3DPS20_MAX_DYNAMICFLOWCONTROLDEPTH;
-    if (pCaps->PS20Caps.StaticFlowControlDepth > D3DPS20_MAX_STATICFLOWCONTROLDEPTH)
+    if (pCaps->PS20Caps.StaticFlowControlDepth > D3DPS20_MAX_STATICFLOWCONTROLDEPTH
+        || pCaps->PS20Caps.StaticFlowControlDepth < 0)
         pCaps->PS20Caps.StaticFlowControlDepth = D3DPS20_MAX_STATICFLOWCONTROLDEPTH;
     if (pCaps->PS20Caps.NumTemps > D3DPS20_MAX_NUMTEMPS)
         pCaps->PS20Caps.NumTemps = D3DPS20_MAX_NUMTEMPS;

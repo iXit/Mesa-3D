@@ -526,9 +526,16 @@ nine_ff_build_vs(struct NineDevice9 *device, struct vs_build_ctx *vs)
      */
     if (key->vertexpointsize) {
         struct ureg_src cPsz1 = ureg_DECL_constant(ureg, 26);
+#ifdef NINE_TGSI_LAZY_DEVS
+        struct ureg_dst tmp_clamp = ureg_DECL_temporary(ureg);
+
+        ureg_MAX(ureg, tmp_clamp, vs->aPsz, _XXXX(cPsz1));
+        ureg_MIN(ureg, oPsz, ureg_src(tmp_clamp), _YYYY(cPsz1));
+        ureg_release_temporary(ureg, tmp_clamp);
+#else
         ureg_CLAMP(ureg, oPsz, vs->aPsz, _XXXX(cPsz1), _YYYY(cPsz1));
-    } else
-    if (key->pointscale) {
+#endif
+    } else if (key->pointscale) {
         struct ureg_dst tmp_x = ureg_writemask(tmp, TGSI_WRITEMASK_X);
         struct ureg_dst tmp_y = ureg_writemask(tmp, TGSI_WRITEMASK_Y);
         struct ureg_src cPsz1 = ureg_DECL_constant(ureg, 26);
@@ -540,7 +547,15 @@ nine_ff_build_vs(struct NineDevice9 *device, struct vs_build_ctx *vs)
         ureg_MAD(ureg, tmp_x, _Y(tmp), _X(tmp), _WWWW(cPsz1));
         ureg_RCP(ureg, tmp_x, ureg_src(tmp));
         ureg_MUL(ureg, tmp_x, ureg_src(tmp), _ZZZZ(cPsz1));
+#ifdef NINE_TGSI_LAZY_DEVS
+        struct ureg_dst tmp_clamp = ureg_DECL_temporary(ureg);
+
+        ureg_MAX(ureg, tmp_clamp, _X(tmp), _XXXX(cPsz1));
+        ureg_MIN(ureg, oPsz, ureg_src(tmp_clamp), _YYYY(cPsz1));
+        ureg_release_temporary(ureg, tmp_clamp);
+#else
         ureg_CLAMP(ureg, oPsz, _X(tmp), _XXXX(cPsz1), _YYYY(cPsz1));
+#endif
     }
 
     /* Texture coordinate generation:

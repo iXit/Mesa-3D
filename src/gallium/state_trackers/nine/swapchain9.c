@@ -80,33 +80,33 @@ NineSwapChain9_Resize( struct NineSwapChain9 *This,
     unsigned i;
 
     DBG("This=%p pParams=%p\n", This, pParams);
-    if (pParams) {
-        DBG("pParams(%p):\n"
-            "BackBufferWidth: %u\n"
-            "BackBufferHeight: %u\n"
-            "BackBufferFormat: %s\n"
-            "BackBufferCount: %u\n"
-            "MultiSampleType: %u\n"
-            "MultiSampleQuality: %u\n"
-            "SwapEffect: %u\n"
-            "hDeviceWindow: %p\n"
-            "Windowed: %i\n"
-            "EnableAutoDepthStencil: %i\n"
-            "AutoDepthStencilFormat: %s\n"
-            "Flags: %s\n"
-            "FullScreen_RefreshRateInHz: %u\n"
-            "PresentationInterval: %x\n", pParams,
-            pParams->BackBufferWidth, pParams->BackBufferHeight,
-            d3dformat_to_string(pParams->BackBufferFormat),
-            pParams->BackBufferCount,
-            pParams->MultiSampleType, pParams->MultiSampleQuality,
-            pParams->SwapEffect, pParams->hDeviceWindow, pParams->Windowed,
-            pParams->EnableAutoDepthStencil,
-            d3dformat_to_string(pParams->AutoDepthStencilFormat),
-            nine_D3DPRESENTFLAG_to_str(pParams->Flags),
-            pParams->FullScreen_RefreshRateInHz,
-            pParams->PresentationInterval);
-    }
+    user_assert(pParams != NULL, E_POINTER);
+
+    DBG("pParams(%p):\n"
+        "BackBufferWidth: %u\n"
+        "BackBufferHeight: %u\n"
+        "BackBufferFormat: %s\n"
+        "BackBufferCount: %u\n"
+        "MultiSampleType: %u\n"
+        "MultiSampleQuality: %u\n"
+        "SwapEffect: %u\n"
+        "hDeviceWindow: %p\n"
+        "Windowed: %i\n"
+        "EnableAutoDepthStencil: %i\n"
+        "AutoDepthStencilFormat: %s\n"
+        "Flags: %s\n"
+        "FullScreen_RefreshRateInHz: %u\n"
+        "PresentationInterval: %x\n", pParams,
+        pParams->BackBufferWidth, pParams->BackBufferHeight,
+        d3dformat_to_string(pParams->BackBufferFormat),
+        pParams->BackBufferCount,
+        pParams->MultiSampleType, pParams->MultiSampleQuality,
+        pParams->SwapEffect, pParams->hDeviceWindow, pParams->Windowed,
+        pParams->EnableAutoDepthStencil,
+        d3dformat_to_string(pParams->AutoDepthStencilFormat),
+        nine_D3DPRESENTFLAG_to_str(pParams->Flags),
+        pParams->FullScreen_RefreshRateInHz,
+        pParams->PresentationInterval);
 
     if (pParams->BackBufferFormat == D3DFMT_UNKNOWN)
         pParams->BackBufferFormat = This->params.BackBufferFormat;

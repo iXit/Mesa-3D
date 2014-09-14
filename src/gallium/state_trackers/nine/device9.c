@@ -2624,7 +2624,6 @@ NineDevice9_ProcessVertices( struct NineDevice9 *This,
                              DWORD Flags )
 {
     struct pipe_screen *screen = This->screen;
-    struct NineVertexBuffer9 *dst = NineVertexBuffer9(pDestBuffer);
     struct NineVertexDeclaration9 *vdecl = NineVertexDeclaration9(pVertexDecl);
     struct NineVertexShader9 *vs;
     struct pipe_resource *resource;
@@ -2639,8 +2638,10 @@ NineDevice9_ProcessVertices( struct NineDevice9 *This,
     nine_update_state(This, ~0);
 
     /* TODO: Create shader with stream output. */
-    vs = This->state.vs ? This->state.vs : This->ff.vs;
     STUB(D3DERR_INVALIDCALL);
+    struct NineVertexBuffer9 *dst = NineVertexBuffer9(pDestBuffer);
+
+    vs = This->state.vs ? This->state.vs : This->ff.vs;
 
     buffer_size = VertexCount * vs->so->stride[0];
     if (1) {

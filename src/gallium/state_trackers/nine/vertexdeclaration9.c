@@ -514,5 +514,5 @@ out:
     if (transfer)
         pipe->transfer_unmap(pipe, transfer);
     translate->release(translate); /* TODO: cache these */
-    return D3D_OK;
+    return hr;
 }

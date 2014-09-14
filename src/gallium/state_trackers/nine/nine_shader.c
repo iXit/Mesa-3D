@@ -2131,9 +2131,9 @@ DECL_SPECIAL(TEXM3x3)
         ureg_MOV(ureg, ureg_writemask(dst, TGSI_WRITEMASK_W), ureg_imm1f(ureg, 1.0f));
         break;
     case D3DSIO_TEXM3x3TEX:
-        src[4] = ureg_DECL_sampler(ureg, m + 2);
+        src[3] = ureg_DECL_sampler(ureg, m + 2);
         tx->info->sampler_mask |= 1 << (m + 2);
-        ureg_TEX(ureg, dst, ps1x_sampler_type(tx->info, m + 2), ureg_src(dst), src[4]);
+        ureg_TEX(ureg, dst, ps1x_sampler_type(tx->info, m + 2), ureg_src(dst), src[3]);
         break;
     default:
         return D3DERR_INVALIDCALL;

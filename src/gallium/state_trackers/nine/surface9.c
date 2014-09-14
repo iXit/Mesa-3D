@@ -424,14 +424,14 @@ NineSurface9_ReleaseDC( struct NineSurface9 *This,
 HRESULT
 NineSurface9_AllocateData( struct NineSurface9 *This )
 {
+#if 0
     struct pipe_screen *screen = This->base.info.screen;
-
     /* XXX: Can't use staging resource because apparently apps expect
      * memory offsets to be the same across locks.
      * NV50 doesn't support direct mapping yet so only enable this if
      * everything else works.
      */
-    if (This->base.pool == D3DPOOL_SYSTEMMEM && 0) {
+    if (This->base.pool == D3DPOOL_SYSTEMMEM) {
         /* Allocate a staging resource to save a copy:
          * user -> staging resource
          * staging resource -> (blit) -> video memory
@@ -471,6 +471,7 @@ NineSurface9_AllocateData( struct NineSurface9 *This )
         /* Also deallocate old staging resource. */
         pipe_resource_reference(&This->base.resource, resource);
     }
+#endif
     if (!This->base.resource) {
         const unsigned size = This->stride *
             util_format_get_nblocksy(This->base.info.format, This->desc.Height);

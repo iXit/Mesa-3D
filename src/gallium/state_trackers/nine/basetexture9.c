@@ -470,6 +470,7 @@ NineBaseTexture9_UpdateSamplerView( struct NineBaseTexture9 *This,
     templ.swizzle_g = swizzle[1];
     templ.swizzle_b = swizzle[2];
     templ.swizzle_a = swizzle[3];
+    templ.target = resource->target;
 
     This->view[sRGB] = pipe->create_sampler_view(pipe, resource, &templ);
 

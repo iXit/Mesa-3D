@@ -33,6 +33,9 @@ struct NineSurface9;
 struct nine_winsys_swapchain;
 struct blit_state;
 
+#define DRI_SWAP_FENCES_MAX 4
+#define DRI_SWAP_FENCES_MASK 3
+
 struct NineSwapChain9
 {
     struct NineUnknown base;
@@ -49,7 +52,18 @@ struct NineSwapChain9
     BOOL implicit;
 
     /* buffer handles */
-    struct NineSurface9 **buffers; /* [0] is frontbuffer */
+    struct NineSurface9 **buffers; /* 0 to BackBufferCount-1 : the back buffers. BackBufferCount : additional buffer */
+    struct pipe_resource **present_buffers;
+    D3DWindowBuffer **present_handles;
+
+    struct pipe_fence_handle *swap_fences[DRI_SWAP_FENCES_MAX];
+    unsigned int cur_fences;
+    unsigned int head;
+    unsigned int tail;
+    unsigned int desired_fences;
+
+    BOOL rendering_done;
+
     struct NineSurface9 *zsbuf;
 
     D3DGAMMARAMP gamma;

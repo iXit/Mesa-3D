@@ -33,6 +33,7 @@
 typedef struct ID3DPresent ID3DPresent;
 typedef struct ID3DPresentGroup ID3DPresentGroup;
 typedef struct ID3DAdapter9 ID3DAdapter9;
+typedef struct D3DWindowBuffer D3DWindowBuffer;
 
 /* Presentation backend for drivers to display their brilliant work */
 typedef struct ID3DPresentVtbl
@@ -47,14 +48,21 @@ typedef struct ID3DPresentVtbl
      * Hence why this should always be called as the one of first things a new
      * swap chain does */
     HRESULT (WINAPI *GetPresentParameters)(ID3DPresent *This, D3DPRESENT_PARAMETERS *pPresentationParameters);
-    /* In alignment with d3d1x, always draw to a window system provided instead
-     * of going the optimum way. The issue here of course is that it requires
-     * an extra blit. See d3d1x/dxgi/src/dxgi_native.cpp for a long discussion
-     * of how to optimally implement presentation */
-    HRESULT (WINAPI *GetBuffer)(ID3DPresent *This, HWND hWndOverride, void *pBuffer, const RECT *pDestRect, RECT *pRect, RGNDATA **ppRegion);
-    /* Get a handle to the front buffer, or a copy of the front buffer */
-    HRESULT (WINAPI *GetFrontBuffer)(ID3DPresent *This, void *pBuffer);
-    HRESULT (WINAPI *Present)(ID3DPresent *This, DWORD Flags);
+    HRESULT (WINAPI *SetPresentParameters)(ID3DPresent *This, D3DPRESENT_PARAMETERS *pPresentationParameters);
+    /* Make a buffer visible to the window system via dma-buf fd.
+     * For better compatibility, it must be 32bpp and format ARGB/XRGB */
+    HRESULT (WINAPI *NewD3DWindowBufferFromDmaBuf)(ID3DPresent *This, int dmaBufFd, int width, int height, int stride, int depth, int bpp, D3DWindowBuffer **out);
+    HRESULT (WINAPI *DestroyD3DWindowBuffer)(ID3DPresent *This, D3DWindowBuffer *buffer);
+    /* After presenting a buffer to the window system, the buffer
+     * may be used as is (no copy of the content) by the window system.
+     * You must not use a non-released buffer, else the user may see undefined content. */
+    HRESULT (WINAPI *IsBufferReleased)(ID3DPresent *This, D3DWindowBuffer *buffer, BOOL *bReleased);
+    /* It is possible buffers are not released in order */
+    HRESULT (WINAPI *WaitOneBufferReleased)(ID3DPresent *This);
+    HRESULT (WINAPI *FrontBufferCopy)(ID3DPresent *This, D3DWindowBuffer *buffer);
+    /* It is possible to do partial copy, but impossible to do resizing, which must
+     * be done by the client after checking the front buffer size */
+    HRESULT (WINAPI *PresentBuffer)(ID3DPresent *This, D3DWindowBuffer *buffer, HWND hWndOverride, const RECT *pSourceRect, const RECT *pDestRect, const RGNDATA *pDirtyRegion, DWORD Flags);
     HRESULT (WINAPI *GetRasterStatus)(ID3DPresent *This, D3DRASTER_STATUS *pRasterStatus);
     HRESULT (WINAPI *GetDisplayMode)(ID3DPresent *This, D3DDISPLAYMODEEX *pMode, D3DDISPLAYROTATION *pRotation);
     HRESULT (WINAPI *GetPresentStats)(ID3DPresent *This, D3DPRESENTSTATS *pStats);
@@ -63,7 +71,7 @@ typedef struct ID3DPresentVtbl
     /* Cursor size is always 32x32. pBitmap and pHotspot can be NULL. */
     HRESULT (WINAPI *SetCursor)(ID3DPresent *This, void *pBitmap, POINT *pHotspot, BOOL bShow);
     HRESULT (WINAPI *SetGammaRamp)(ID3DPresent *This, const D3DGAMMARAMP *pRamp, HWND hWndOverride);
-    HRESULT (WINAPI *GetWindowRect)(ID3DPresent *This, HWND hWnd, LPRECT pRect);
+    HRESULT (WINAPI *GetWindowInfo)(ID3DPresent *This,  HWND hWnd, int *width, int *height, int *depth);
 } ID3DPresentVtbl;
 
 struct ID3DPresent
@@ -77,9 +85,13 @@ struct ID3DPresent
 #define ID3DPresent_Release(p) (p)->lpVtbl->Release(p)
 /* ID3DPresent macros */
 #define ID3DPresent_GetPresentParameters(p,a) (p)->lpVtbl->GetPresentParameters(p,a)
-#define ID3DPresent_GetBuffer(p,a,b,c,d,e) (p)->lpVtbl->GetBuffer(p,a,b,c,d,e)
-#define ID3DPresent_GetFrontBuffer(p,a) (p)->lpVtbl->GetFrontBuffer(p,a)
-#define ID3DPresent_Present(p,a) (p)->lpVtbl->Present(p,a)
+#define ID3DPresent_SetPresentParameters(p,a) (p)->lpVtbl->SetPresentParameters(p,a)
+#define ID3DPresent_NewD3DWindowBufferFromDmaBuf(p,a,b,c,d,e,f,g) (p)->lpVtbl->NewD3DWindowBufferFromDmaBuf(p,a,b,c,d,e,f,g)
+#define ID3DPresent_DestroyD3DWindowBuffer(p,a) (p)->lpVtbl->DestroyD3DWindowBuffer(p,a)
+#define ID3DPresent_IsBufferReleased(p,a,b) (p)->lpVtbl->IsBufferReleased(p,a,b)
+#define ID3DPresent_WaitOneBufferReleased(p) (p)->lpVtbl->WaitOneBufferReleased(p)
+#define ID3DPresent_FrontBufferCopy(p,a) (p)->lpVtbl->FrontBufferCopy(p,a)
+#define ID3DPresent_PresentBuffer(p,a,b,c,d,e,f) (p)->lpVtbl->PresentBuffer(p,a,b,c,d,e,f)
 #define ID3DPresent_GetRasterStatus(p,a) (p)->lpVtbl->GetRasterStatus(p,a)
 #define ID3DPresent_GetDisplayMode(p,a,b) (p)->lpVtbl->GetDisplayMode(p,a,b)
 #define ID3DPresent_GetPresentStats(p,a) (p)->lpVtbl->GetPresentStats(p,a)
@@ -87,7 +99,7 @@ struct ID3DPresent
 #define ID3DPresent_SetCursorPos(p,a) (p)->lpVtbl->SetCursorPos(p,a)
 #define ID3DPresent_SetCursor(p,a,b,c) (p)->lpVtbl->SetCursor(p,a,b,c)
 #define ID3DPresent_SetGammaRamp(p,a,b) (p)->lpVtbl->SetGammaRamp(p,a,b)
-#define ID3DPresent_GetWindowRect(p,a,b) (p)->lpVtbl->GetWindowRect(p,a,b)
+#define ID3DPresent_GetWindowInfo(p,a,b,c,d) (p)->lpVtbl->GetWindowSize(p,a,b,c,d)
 
 typedef struct ID3DPresentGroupVtbl
 {
@@ -105,6 +117,7 @@ typedef struct ID3DPresentGroupVtbl
     HRESULT (WINAPI *GetPresent)(ID3DPresentGroup *This, UINT Index, ID3DPresent **ppPresent);
     /* used to create additional presentation interfaces along the way */
     HRESULT (WINAPI *CreateAdditionalPresent)(ID3DPresentGroup *This, D3DPRESENT_PARAMETERS *pPresentationParameters, ID3DPresent **ppPresent);
+    void (WINAPI *GetVersion) (ID3DPresentGroup *This, int *major, int *minor);
 } ID3DPresentGroupVtbl;
 
 struct ID3DPresentGroup
@@ -120,26 +133,7 @@ struct ID3DPresentGroup
 #define ID3DPresentGroup_GetMultiheadCount(p) (p)->lpVtbl->GetMultiheadCount(p)
 #define ID3DPresentGroup_GetPresent(p,a,b) (p)->lpVtbl->GetPresent(p,a,b)
 #define ID3DPresentGroup_CreateAdditionalPresent(p,a,b) (p)->lpVtbl->CreateAdditionalPresent(p,a,b)
-
-#else /* __cplusplus */
-
-struct ID3DPresent : public IUnknown
-{
-    HRESULT WINAPI GetPresentParameters(D3DPRESENT_PARAMETERS *pPresentationParameters);
-    HRESULT WINAPI GetBuffer(HWND hWndOverride, void *pBuffer, const RECT *pDestRect, RECT *pRect, RGNDATA **ppRegion);
-    HRESULT WINAPI GetFrontBuffer(void *pBuffer);
-    HRESULT WINAPI Present(DWORD Flags);
-    HRESULT WINAPI GetRasterStatus(D3DRASTER_STATUS *pRasterStatus);
-    HRESULT WINAPI GetDisplayMode(D3DDISPLAYMODEEX *pMode);
-    HRESULT WINAPI GetPresentStats(D3DPRESENTSTATS *pStats);
-};
-
-struct ID3DPresentGroup : public IUnknown
-{
-    UINT WINAPI GetMultiheadCount();
-    HRESULT WINAPI GetPresent(UINT Index, ID3DPresent **ppPresent);
-    HRESULT WINAPI CreateAdditionalPresent(D3DPRESENT_PARAMETERS *pPresentationParameters, ID3DPresent **ppPresent);
-};
+#define ID3DPresentGroup_GetVersion(p,a,b) (p)->lpVtbl->GetVersion(p,a,b)
 
 #endif /* __cplusplus */
 

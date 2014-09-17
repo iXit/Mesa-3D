@@ -550,18 +550,19 @@ NineDevice9_CreateAdditionalSwapChain( struct NineDevice9 *This,
                                        IDirect3DSwapChain9 **pSwapChain )
 {
     struct NineSwapChain9 *swapchain, *tmplt = This->swapchains[0];
+    ID3DPresent *present;
     HRESULT hr;
 
     user_assert(pPresentationParameters, D3DERR_INVALIDCALL);
 
-    hr = NineSwapChain9_new(This, FALSE, tmplt->present, tmplt->actx,
-                            tmplt->params.hDeviceWindow, /* XXX */
-                            &swapchain);
+    hr = ID3DPresentGroup_CreateAdditionalPresent(This->present, pPresentationParameters, &present);
+
     if (FAILED(hr))
         return hr;
 
-    /* XXX: Yes, this is wasteful ... */
-    hr = NineSwapChain9_Resize(swapchain, pPresentationParameters);
+    hr = NineSwapChain9_new(This, FALSE, present, tmplt->actx,
+                            tmplt->params.hDeviceWindow,
+                            &swapchain);
     if (FAILED(hr))
         return hr;
 

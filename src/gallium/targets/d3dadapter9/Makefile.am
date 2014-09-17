@@ -29,6 +29,7 @@ AM_CFLAGS = \
 	-I$(top_srcdir)/src/gallium/winsys \
 	-I$(top_srcdir)/src/gallium/state_trackers/nine \
 	-I$(top_srcdir)/include/D3D9 \
+	-I$(top_srcdir)/src/loader \
 	-DPIPE_SEARCH_DIR=\"$(GALLIUM_PIPE_LOADER_DIR)\" \
 	$(GALLIUM_PIPE_LOADER_DEFINES)
 

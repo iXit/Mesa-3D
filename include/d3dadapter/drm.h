@@ -41,14 +41,4 @@ struct D3DAdapter9DRM
     HRESULT (WINAPI *create_adapter)(int fd, ID3DAdapter9 **ppAdapter);
 };
 
-/* presentation buffer */
-typedef struct _D3DDRM_BUFFER
-{
-    INT iName;
-    DWORD dwWidth;
-    DWORD dwHeight;
-    DWORD dwStride;
-    DWORD dwCPP;
-} D3DDRM_BUFFER;
-
 #endif /* _D3DADAPTER9_DRM_H_ */

@@ -71,18 +71,21 @@ NineAdapter9_GetScreen( struct NineAdapter9 *This,
                         D3DDEVTYPE DevType,
                         struct pipe_screen **ppScreen )
 {
+    const char *force_sw = getenv("D3D_ALWAYS_SOFTWARE");
     switch (DevType) {
         case D3DDEVTYPE_HAL:
+            if (force_sw && !strcmp(force_sw, "1") && This->ctx->ref) {
+                *ppScreen = This->ctx->ref;
+                break;
+            }
             *ppScreen = This->ctx->hal;
             break;
 
         case D3DDEVTYPE_REF:
         case D3DDEVTYPE_NULLREF:
+        case D3DDEVTYPE_SW:
             *ppScreen = This->ctx->ref;
             break;
-
-        case D3DDEVTYPE_SW:
-            return D3DERR_NOTAVAILABLE;
 
         default:
             user_assert(!"Invalid device type", D3DERR_INVALIDCALL);
@@ -502,9 +505,9 @@ NineAdapter9_GetDeviceCaps( struct NineAdapter9 *This,
 
     pCaps->PresentationIntervals = D3DPRESENT_INTERVAL_DEFAULT |
                                    D3DPRESENT_INTERVAL_ONE |
-                                   /*D3DPRESENT_INTERVAL_TWO |*/
-                                   /*D3DPRESENT_INTERVAL_THREE |*/
-                                   /*D3DPRESENT_INTERVAL_FOUR |*/
+                                   D3DPRESENT_INTERVAL_TWO |
+                                   D3DPRESENT_INTERVAL_THREE |
+                                   D3DPRESENT_INTERVAL_FOUR |
                                    D3DPRESENT_INTERVAL_IMMEDIATE;
     pCaps->CursorCaps = D3DCURSORCAPS_COLOR | D3DCURSORCAPS_LOWRES;
 
@@ -941,6 +944,7 @@ NineAdapter9_CreateDevice( struct NineAdapter9 *This,
     struct pipe_screen *screen;
     D3DDEVICE_CREATION_PARAMETERS params;
     D3DCAPS9 caps;
+    int major, minor;
     HRESULT hr;
 
     DBG("This=%p RealAdapter=%u DeviceType=%s hFocusWindow=%p "
@@ -948,6 +952,13 @@ NineAdapter9_CreateDevice( struct NineAdapter9 *This,
         "ppReturnedDeviceInterface=%p\n", This,
         RealAdapter, nine_D3DDEVTYPE_to_str(DeviceType), hFocusWindow,
         BehaviorFlags, pD3D9, pPresentationGroup, ppReturnedDeviceInterface);
+
+    ID3DPresentGroup_GetVersion(pPresentationGroup, &major, &minor);
+    if (major != 1) {
+        ERR("Doesn't support the ID3DPresentGroup version %d %d. Expected 1\n",
+            major, minor);
+        return D3DERR_NOTAVAILABLE;
+    }
 
     hr = NineAdapter9_GetScreen(This, DeviceType, &screen);
     if (FAILED(hr)) {
@@ -991,6 +1002,7 @@ NineAdapter9_CreateDeviceEx( struct NineAdapter9 *This,
     struct pipe_screen *screen;
     D3DDEVICE_CREATION_PARAMETERS params;
     D3DCAPS9 caps;
+    int major, minor;
     HRESULT hr;
 
     DBG("This=%p RealAdapter=%u DeviceType=%s hFocusWindow=%p "
@@ -998,6 +1010,13 @@ NineAdapter9_CreateDeviceEx( struct NineAdapter9 *This,
         "ppReturnedDeviceInterface=%p\n", This,
         RealAdapter, nine_D3DDEVTYPE_to_str(DeviceType), hFocusWindow,
         BehaviorFlags, pD3D9Ex, pPresentationGroup, ppReturnedDeviceInterface);
+
+    ID3DPresentGroup_GetVersion(pPresentationGroup, &major, &minor);
+    if (major != 1) {
+        ERR("Doesn't support the ID3DPresentGroup version %d %d. Expected 1\n",
+            major, minor);
+        return D3DERR_NOTAVAILABLE;
+    }
 
     hr = NineAdapter9_GetScreen(This, DeviceType, &screen);
     if (FAILED(hr)) {

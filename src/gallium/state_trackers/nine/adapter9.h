@@ -34,26 +34,7 @@ struct d3dadapter9_context
 {
     struct pipe_screen *hal, *ref;
     D3DADAPTER_IDENTIFIER9 identifier;
-
-    /**
-     * Get a gallium resource from an ID3DPresent COM interface
-     * \param screen   the screen to wrap on (->hal and ->ref only)
-     * \param present  presentation interface to query
-     * \param ovr      hWndOverride from IDirect3DSwapChain9::Present
-     * \param rect     pDestRect in, final rect to render to out
-     * \param rgn      region to render to (takes precedence over rect)
-     * \param res_out  returned struct pipe_resource
-     * \return D3D_OK if success, D3DOK_WINDOW_OCCLUDED if nothing needs to be
-     *  rendered; D3DERR_* otherwise.
-     */
-    HRESULT (*resource_from_present)( struct d3dadapter9_context *ctx,
-                                      struct pipe_screen *screen,
-                                      ID3DPresent *present,
-                                      HWND ovr,
-                                      const RECT *dest,
-                                      RECT *rect,
-                                      RGNDATA **rgn,
-                                      struct pipe_resource **res_out );
+    BOOL linear_framebuffer;
 
     void (*destroy)( struct d3dadapter9_context *ctx );
 };

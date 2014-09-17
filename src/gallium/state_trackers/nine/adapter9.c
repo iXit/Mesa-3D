@@ -502,9 +502,9 @@ NineAdapter9_GetDeviceCaps( struct NineAdapter9 *This,
 
     pCaps->PresentationIntervals = D3DPRESENT_INTERVAL_DEFAULT |
                                    D3DPRESENT_INTERVAL_ONE |
-                                   /*D3DPRESENT_INTERVAL_TWO |*/
-                                   /*D3DPRESENT_INTERVAL_THREE |*/
-                                   /*D3DPRESENT_INTERVAL_FOUR |*/
+                                   D3DPRESENT_INTERVAL_TWO |
+                                   D3DPRESENT_INTERVAL_THREE |
+                                   D3DPRESENT_INTERVAL_FOUR |
                                    D3DPRESENT_INTERVAL_IMMEDIATE;
     pCaps->CursorCaps = D3DCURSORCAPS_COLOR | D3DCURSORCAPS_LOWRES;
 

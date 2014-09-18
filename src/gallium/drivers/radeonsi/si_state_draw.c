@@ -309,7 +309,7 @@ static void si_pipe_shader_ps(struct pipe_context *ctx, struct si_pipe_shader *s
 		/* Last 2 reserved SGPRs are used for VCC */
 		num_sgprs = num_user_sgprs + 1 + 2;
 	}
-	assert(num_sgprs <= 104);
+	assert(num_sgprs <= 204);
 
 	si_pm4_set_reg(pm4, R_00B028_SPI_SHADER_PGM_RSRC1_PS,
 		       S_00B028_VGPRS((shader->num_vgprs - 1) / 4) |

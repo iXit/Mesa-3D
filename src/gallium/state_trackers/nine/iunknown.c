@@ -95,12 +95,10 @@ NineUnknown_AddRef( struct NineUnknown *This )
 ULONG WINAPI
 NineUnknown_Release( struct NineUnknown *This )
 {
-    ULONG r;
     if (This->forward)
         return NineUnknown_Release(This->container);
-    else
-        r = p_atomic_dec_return(&This->refs);
-    assert(r != -1); /* this would signify implementation error */
+
+    ULONG r = p_atomic_dec_return(&This->refs);
 
     if (r == 0) {
         if (This->device) {

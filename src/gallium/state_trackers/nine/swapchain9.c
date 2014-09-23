@@ -457,7 +457,7 @@ present( struct NineSwapChain9 *This,
      * which decreases input lag (see dri2 state tracker for an alternative implementation).
      * If the flag D3DPRESENT_DONOTWAIT is set, we have to return D3DERR_WASSTILLDRAWING if we would have to wait.
      * Note that the following Present call can also return that, and we'll have to care about that.
-    /* really present the frame */
+     * really present the frame */
     This->rendering_done = TRUE;
 bypass_rendering:
     hr = ID3DPresent_PresentBuffer(This->present, This->present_handles[0], hDestWindowOverride, pSourceRect, pDestRect, pDirtyRegion, dwFlags);

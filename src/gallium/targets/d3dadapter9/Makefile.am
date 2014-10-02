@@ -30,6 +30,11 @@ AM_CFLAGS = \
 	-I$(top_srcdir)/src/gallium/state_trackers/nine \
 	-I$(top_srcdir)/include/D3D9 \
 	-I$(top_srcdir)/src/loader \
+	-I$(top_srcdir)/src/mesa/drivers/dri/common/ \
+	-I$(top_builddir)/src/mesa/drivers/dri/common/ \
+	-I$(top_srcdir)/src/mesa/ \
+	-I$(top_srcdir)/src/mapi/ \
+	$(LIBDRM_CFLAGS) \
 	-DPIPE_SEARCH_DIR=\"$(GALLIUM_PIPE_LOADER_DIR)\" \
 	$(GALLIUM_PIPE_LOADER_DEFINES)
 
@@ -53,7 +58,9 @@ libd3dadapter9_la_LIBADD = \
 	$(top_builddir)/src/util/libmesautil.la \
 	$(GALLIUM_PIPE_LOADER_LIBS) \
 	$(LIBUDEV_LIBS) \
-	$(GALLIUM_COMMON_LIB_DEPS)
+	$(GALLIUM_COMMON_LIB_DEPS) \
+	-lm \
+	$(EXPAT_LIBS)
 
 if NEED_WINSYS_XLIB
 libd3dadapter9_la_LIBADD += \

@@ -162,6 +162,13 @@ NineSwapChain9_Resize( struct NineSwapChain9 *This,
     if (This->desired_fences > DRI_SWAP_FENCES_MAX)
         This->desired_fences = DRI_SWAP_FENCES_MAX;
 
+    if (This->actx->vsync_force) {
+        if (This->actx->vsync_force == 1)
+            pParams->PresentationInterval = D3DPRESENT_INTERVAL_IMMEDIATE;
+        else /* (This->actx->vsync_force == 2) */
+            pParams->PresentationInterval = D3DPRESENT_INTERVAL_ONE;
+    }
+
     /* Note: It is the role of the backend to fill if neccessary
      * BackBufferWidth and BackBufferHeight */
     ID3DPresent_SetPresentParameters(This->present, pParams);

@@ -340,3 +340,25 @@ DRI_CONF_SECTION_BEGIN \
 DRI_CONF_OPT_BEGIN(device_id, string, def) \
         DRI_CONF_DESC(en,gettext("Define the graphic device to use if possible")) \
 DRI_CONF_OPT_END
+
+/**
+ * \brief Gallium-Nine specific configuration options
+ */
+
+#define DRI_CONF_SECTION_NINE \
+DRI_CONF_SECTION_BEGIN \
+        DRI_CONF_DESC(en,gettext("Gallium Nine"))
+
+#define DRI_CONF_NINE_VSYNC(def) \
+DRI_CONF_OPT_BEGIN_V(vsync_force,enum,def,"0:2") \
+        DRI_CONF_DESC_BEGIN(en,gettext("Force the usage of vsync")) \
+                DRI_CONF_ENUM(0,gettext("Obey application's choice")) \
+                DRI_CONF_ENUM(1,gettext("Never synchronize with vertical refresh")) \
+                DRI_CONF_ENUM(2,gettext("Always synchronize with vertical refresh")) \
+        DRI_CONF_DESC_END \
+DRI_CONF_OPT_END
+
+#define DRI_CONF_NINE_THROTTLE(def) \
+DRI_CONF_OPT_BEGIN(throttle_value, int, def) \
+        DRI_CONF_DESC(en,gettext("Define the throttling value. -1 for no throttling, -2 for default (usually 2), 0 for glfinish behaviour")) \
+DRI_CONF_OPT_END

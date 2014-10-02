@@ -34,6 +34,9 @@
 #include "d3dadapter/d3dadapter9.h"
 #include "d3dadapter/drm.h"
 
+#include "xmlconfig.h"
+#include "xmlpool.h"
+
 #include <libdrm/drm.h>
 #include <sys/ioctl.h>
 #include <fcntl.h>
@@ -46,6 +49,14 @@
         ((DWORD)((hi) & 0xFFFF) << 16) | \
          (DWORD)((lo) & 0xFFFF) \
     ))
+
+const char __driConfigOptionsNine[] =
+DRI_CONF_BEGIN
+    DRI_CONF_SECTION_NINE
+        DRI_CONF_NINE_VSYNC(0)
+        DRI_CONF_NINE_THROTTLE(-2)
+    DRI_CONF_SECTION_END
+DRI_CONF_END;
 
 /* Regarding os versions, we should not define our own as that would simply be
  * weird. Defaulting to Win2k/XP seems sane considering the origin of D3D9. The
@@ -223,6 +234,9 @@ drm_create_adapter( int fd,
     int i, different_device;
     const struct drm_conf_ret *throttle_ret = NULL;
     const struct drm_conf_ret *dmabuf_ret = NULL;
+    driOptionCache defaultInitOptions;
+    driOptionCache userInitOptions;
+    int throttling_value_user;
     
     const char *paths[] = {
         getenv("D3D9_DRIVERS_PATH"),
@@ -273,7 +287,26 @@ drm_create_adapter( int fd,
         ctx->base.throttling_value = throttle_ret->val.val_int;
     } else
         ctx->base.throttling = FALSE;
-    
+
+    driParseOptionInfo(&defaultInitOptions, __driConfigOptionsNine);
+    driParseConfigFiles(&userInitOptions, &defaultInitOptions, 0, "nine");
+    if (driCheckOption(&userInitOptions, "throttle_value", DRI_INT)) {
+        throttling_value_user = driQueryOptioni(&userInitOptions, "throttle_value");
+        if (throttling_value_user == -1)
+            ctx->base.throttling = FALSE;
+        else if (throttling_value_user >= 0) {
+            ctx->base.throttling = TRUE;
+            ctx->base.throttling_value = throttling_value_user;
+        }
+    }
+
+    ctx->base.vsync_force = 0;
+    if (driCheckOption(&userInitOptions, "vsync_force", DRI_ENUM))
+        ctx->base.vsync_force = driQueryOptioni(&userInitOptions, "vsync_force");
+
+    driDestroyOptionCache(&userInitOptions);
+    driDestroyOptionInfo(&defaultInitOptions);
+
     /* wrap it to create a software screen that can share resources */
     if (pipe_loader_sw_probe_wrapped(&ctx->swdev, ctx->base.hal)) {
         ctx->base.ref = NULL;

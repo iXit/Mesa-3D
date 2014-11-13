@@ -36,8 +36,6 @@ struct NineResource9
 
     struct pipe_resource *resource; /* device resource */
 
-    uint8_t *data; /* system memory backing */
-
     D3DRESOURCETYPE type;
     D3DPOOL pool;
     DWORD priority;
@@ -57,9 +55,11 @@ NineResource9( void *data )
 HRESULT
 NineResource9_ctor( struct NineResource9 *This,
                     struct NineUnknownParams *pParams,
+                    struct pipe_resource *initResource,
                     BOOL Allocate,
                     D3DRESOURCETYPE Type,
-                    D3DPOOL Pool );
+                    D3DPOOL Pool,
+                    DWORD Usage);
 
 void
 NineResource9_dtor( struct NineResource9 *This );

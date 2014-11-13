@@ -50,9 +50,6 @@ NineCubeTexture9_ctor( struct NineCubeTexture9 *This,
     if (Usage & D3DUSAGE_AUTOGENMIPMAP)
         Levels = 0;
 
-    This->base.format = Format;
-    This->base.base.usage = Usage;
-
     info->screen = pParams->device->screen;
     info->target = PIPE_TEXTURE_CUBE;
     info->format = d3d9_to_pipe_format(Format);
@@ -85,8 +82,8 @@ NineCubeTexture9_ctor( struct NineCubeTexture9 *This,
     if (!This->surfaces)
         return E_OUTOFMEMORY;
 
-    hr = NineBaseTexture9_ctor(&This->base, pParams, D3DRTYPE_CUBETEXTURE,
-                               Pool);
+    hr = NineBaseTexture9_ctor(&This->base, pParams, NULL, D3DRTYPE_CUBETEXTURE,
+                               Format, Pool, Usage);
     if (FAILED(hr))
         return hr;
     This->base.pstype = 2;
@@ -105,7 +102,7 @@ NineCubeTexture9_ctor( struct NineCubeTexture9 *This,
         sfdesc.Width = sfdesc.Height = u_minify(EdgeLength, i / 6);
 
         hr = NineSurface9_new(This->base.base.base.device, NineUnknown(This),
-                              This->base.base.resource, D3DRTYPE_CUBETEXTURE,
+                              This->base.base.resource, NULL, D3DRTYPE_CUBETEXTURE,
                               i / 6, i % 6,
                               &sfdesc, &This->surfaces[i]);
         if (FAILED(hr))

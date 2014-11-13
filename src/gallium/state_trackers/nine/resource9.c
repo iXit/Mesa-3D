@@ -38,9 +38,11 @@
 HRESULT
 NineResource9_ctor( struct NineResource9 *This,
                     struct NineUnknownParams *pParams,
+                    struct pipe_resource *initResource,
                     BOOL Allocate,
                     D3DRESOURCETYPE Type,
-                    D3DPOOL Pool )
+                    D3DPOOL Pool,
+                    DWORD Usage)
 {
     struct pipe_screen *screen;
     HRESULT hr;
@@ -50,17 +52,20 @@ NineResource9_ctor( struct NineResource9 *This,
         return hr;
 
     This->info.screen = screen = This->base.device->screen;
+    if (initResource)
+        pipe_resource_reference(&This->resource, initResource);
 
     if (Allocate) {
+        assert(!initResource);
         DBG("(%p) Creating pipe_resource.\n", This);
         This->resource = screen->resource_create(screen, &This->info);
         if (!This->resource)
             return D3DERR_OUTOFVIDEOMEMORY;
     }
 
-    This->data = NULL; /* FIXME remove, rather set it to null in surface9.c*/
     This->type = Type;
     This->pool = Pool;
+    This->usage = Usage;
     This->priority = 0;
 
     This->pdata = util_hash_table_create(ht_guid_hash, ht_guid_compare);
@@ -81,10 +86,6 @@ NineResource9_dtor( struct NineResource9 *This )
     /* NOTE: We do have to use refcounting, the driver might
      * still hold a reference. */
     pipe_resource_reference(&This->resource, NULL);
-
-    /* release allocated system memory for non-D3DPOOL_DEFAULT resources */
-    if (This->data)
-        FREE(This->data);
 
     NineUnknown_dtor(&This->base);
 }

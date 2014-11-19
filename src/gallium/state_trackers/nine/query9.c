@@ -192,8 +192,8 @@ NineQuery9_Issue( struct NineQuery9 *This,
     } else {
         if (This->state == NINE_QUERY_STATE_RUNNING) {
             pipe->end_query(pipe, This->pq);
-            This->state = NINE_QUERY_STATE_ENDED;
 	}
+	This->state = NINE_QUERY_STATE_ENDED;
     }
     return D3D_OK;
 }

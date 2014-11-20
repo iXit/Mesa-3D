@@ -2185,7 +2185,7 @@ NineDevice9_SetTexture( struct NineDevice9 *This,
     if (unlikely(tex->base.pool == D3DPOOL_SYSTEMMEM)) {
         /* TODO: Currently not implemented. Better return error
          * with message telling what's wrong */
-        ERR("This=%p D3DPOOL_SYSTEMMEM not implemented for SetTexture\n"n, This);
+        ERR("This=%p D3DPOOL_SYSTEMMEM not implemented for SetTexture\n", This);
         user_assert(tex->base.pool != D3DPOOL_SYSTEMMEM, D3DERR_INVALIDCALL);
     }
 

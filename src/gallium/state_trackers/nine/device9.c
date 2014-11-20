@@ -2180,9 +2180,9 @@ NineDevice9_SetTexture( struct NineDevice9 *This,
                 Stage == D3DDMAPSAMPLER ||
                 (Stage >= D3DVERTEXTEXTURESAMPLER0 &&
                  Stage <= D3DVERTEXTEXTURESAMPLER3), D3DERR_INVALIDCALL);
-    user_assert(tex->base.pool != D3DPOOL_SCRATCH, D3DERR_INVALIDCALL);
+    user_assert(!tex || tex->base.pool != D3DPOOL_SCRATCH, D3DERR_INVALIDCALL);
 
-    if (unlikely(tex->base.pool == D3DPOOL_SYSTEMMEM)) {
+    if (unlikely(tex && tex->base.pool == D3DPOOL_SYSTEMMEM)) {
         /* TODO: Currently not implemented. Better return error
          * with message telling what's wrong */
         ERR("This=%p D3DPOOL_SYSTEMMEM not implemented for SetTexture\n", This);

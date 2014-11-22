@@ -3360,7 +3360,7 @@ NineDevice9_CreateQuery( struct NineDevice9 *This,
     DBG("This=%p Type=%d ppQuery=%p\n", This, Type, ppQuery);
 
     if (!ppQuery)
-        return nine_is_query_supported(Type);
+        return nine_is_query_supported(This->screen, Type);
 
     hr = NineQuery9_new(This, &query, Type);
     if (FAILED(hr))

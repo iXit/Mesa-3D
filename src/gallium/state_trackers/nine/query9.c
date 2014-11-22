@@ -240,8 +240,10 @@ NineQuery9_GetData( struct NineQuery9 *This,
         if (!dwSize)
            return S_OK;
     }
-    if (This->state == NINE_QUERY_STATE_FRESH)
-        return S_OK;
+    if (This->pq && This->state == NINE_QUERY_STATE_FRESH) {
+        /* App forgot issue the request. Be nice and issue it. */
+        (void) NineQuery9_Issue(This, D3DISSUE_END);
+    }
 
     if (!ok) {
         ok = pipe->get_query_result(pipe, This->pq, FALSE, &presult);

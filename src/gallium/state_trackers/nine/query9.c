@@ -23,16 +23,27 @@
 #include "device9.h"
 #include "query9.h"
 #include "nine_helpers.h"
+#include "pipe/p_screen.h"
 #include "pipe/p_context.h"
 #include "util/u_math.h"
+#include "os/os_time.h"
 #include "nine_dump.h"
 
 #define DBG_CHANNEL DBG_QUERY
 
 #define QUERY_TYPE_MAP_CASE(a, b) case D3DQUERYTYPE_##a: return PIPE_QUERY_##b
 static inline unsigned
-d3dquerytype_to_pipe_query(D3DQUERYTYPE type)
+d3dquerytype_to_pipe_query(struct pipe_screen *screen, D3DQUERYTYPE type)
 {
+    if ((type == D3DQUERYTYPE_OCCLUSION &&
+        !screen->get_param(screen, PIPE_CAP_OCCLUSION_QUERY)) ||
+        ((type == D3DQUERYTYPE_TIMESTAMP || type == D3DQUERYTYPE_TIMESTAMPFREQ ||
+        type == D3DQUERYTYPE_TIMESTAMPDISJOINT)&&
+        !screen->get_param(screen, PIPE_CAP_QUERY_TIMESTAMP)) ||
+        (type == D3DQUERYTYPE_VERTEXSTATS &&
+        !screen->get_param(screen, PIPE_CAP_QUERY_PIPELINE_STATISTICS)))
+        return PIPE_QUERY_TYPES;
+
     switch (type) {
     QUERY_TYPE_MAP_CASE(EVENT, GPU_FINISHED);
     QUERY_TYPE_MAP_CASE(OCCLUSION, OCCLUSION_COUNTER);
@@ -84,9 +95,9 @@ nine_query_result_size(D3DQUERYTYPE type)
 }
 
 HRESULT
-nine_is_query_supported(D3DQUERYTYPE type)
+nine_is_query_supported(struct pipe_screen *screen, D3DQUERYTYPE type)
 {
-    const unsigned ptype = d3dquerytype_to_pipe_query(type);
+    const unsigned ptype = d3dquerytype_to_pipe_query(screen, type);
 
     user_assert(ptype != ~0, D3DERR_INVALIDCALL);
 
@@ -104,7 +115,7 @@ NineQuery9_ctor( struct NineQuery9 *This,
                  D3DQUERYTYPE Type )
 {
     struct pipe_context *pipe = pParams->device->pipe;
-    const unsigned ptype = d3dquerytype_to_pipe_query(Type);
+    const unsigned ptype = d3dquerytype_to_pipe_query(pParams->device->screen, Type);
     HRESULT hr;
 
     DBG("This=%p pParams=%p Type=%d\n", This, pParams, Type);
@@ -262,22 +273,39 @@ NineQuery9_GetData( struct NineQuery9 *This,
         nresult.b = presult.b;
         break;
     case D3DQUERYTYPE_OCCLUSION:
-        nresult.dw = presult.u64;
+        if (This->pq)
+            nresult.dw = presult.u64;
+        else
+            nresult.dw = 0;
         break;
     case D3DQUERYTYPE_TIMESTAMP:
-        nresult.u64 = presult.u64;
+        if (This->pq)
+            nresult.u64 = presult.u64;
+        else
+            nresult.u64 = os_time_get_nano();
         break;
     case D3DQUERYTYPE_TIMESTAMPDISJOINT:
-        nresult.b = presult.timestamp_disjoint.disjoint;
+        if (This->pq)
+            nresult.b = presult.timestamp_disjoint.disjoint;
+        else
+            nresult.b = FALSE;
         break;
     case D3DQUERYTYPE_TIMESTAMPFREQ:
-        nresult.u64 = presult.timestamp_disjoint.frequency;
+        if (This->pq)
+            nresult.u64 = presult.timestamp_disjoint.frequency;
+        else
+            nresult.u64 = 1; /* dummy value */
         break;
     case D3DQUERYTYPE_VERTEXSTATS:
-        nresult.vertexstats.NumRenderedTriangles =
-            presult.pipeline_statistics.c_invocations;
-        nresult.vertexstats.NumExtraClippingTriangles =
-            presult.pipeline_statistics.c_primitives;
+        if (This->pq) {
+            nresult.vertexstats.NumRenderedTriangles =
+                presult.pipeline_statistics.c_invocations;
+            nresult.vertexstats.NumExtraClippingTriangles =
+                presult.pipeline_statistics.c_primitives;
+        } else {
+            nresult.vertexstats.NumRenderedTriangles = 1;
+            nresult.vertexstats.NumExtraClippingTriangles = 0;
+        }
         break;
     /* Thse might be doable with driver-specific queries; dummy for now. */
     case D3DQUERYTYPE_BANDWIDTHTIMINGS:

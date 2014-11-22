@@ -70,6 +70,9 @@ NineQuery9_GetType( struct NineQuery9 *This );
 DWORD WINAPI
 NineQuery9_GetDataSize( struct NineQuery9 *This );
 
+HRESULT
+nine_is_begin_query_available(D3DQUERYTYPE);
+
 HRESULT WINAPI
 NineQuery9_Issue( struct NineQuery9 *This,
                   DWORD dwIssueFlags );

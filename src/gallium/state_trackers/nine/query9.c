@@ -222,7 +222,7 @@ NineQuery9_GetData( struct NineQuery9 *This,
                     DWORD dwGetDataFlags )
 {
     struct pipe_context *pipe = This->base.device->pipe;
-    boolean ok = !This->pq;
+    boolean ok;
     unsigned i;
     union pipe_query_result presult;
     union nine_query_result nresult;
@@ -245,7 +245,7 @@ NineQuery9_GetData( struct NineQuery9 *This,
         (void) NineQuery9_Issue(This, D3DISSUE_END);
     }
 
-    if (!ok) {
+    if (This->pq) {
         ok = pipe->get_query_result(pipe, This->pq, FALSE, &presult);
         if (!ok) {
             if (dwGetDataFlags) {

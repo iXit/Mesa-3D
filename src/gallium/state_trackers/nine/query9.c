@@ -264,8 +264,13 @@ NineQuery9_GetData( struct NineQuery9 *This,
         if (!dwSize)
            return S_OK;
     }
-    if (This->state == NINE_QUERY_STATE_FRESH)
+    /* Mimicking wine:
+    D3D allows GetData on a new query, OpenGL doesn't.
+    So we just invent the data ourselves */
+    if (This->state == NINE_QUERY_STATE_FRESH) {
+        memset(pData, 0, dwSize);
         return S_OK;
+    }
 
     if (!ok) {
         ok = pipe->get_query_result(pipe, This->pq, FALSE, &presult);

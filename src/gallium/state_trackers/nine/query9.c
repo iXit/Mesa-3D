@@ -237,8 +237,6 @@ NineQuery9_GetData( struct NineQuery9 *This,
 
     if (!This->pq) {
         DBG("No pipe query available.\n");
-        if (!dwSize)
-           return S_OK;
     }
     if (This->pq && This->state == NINE_QUERY_STATE_FRESH) {
         /* App forgot issue the request. Be nice and issue it. */

@@ -172,14 +172,14 @@ nine_is_begin_query_available(D3DQUERYTYPE type)
 {
     DBG("type=%s\n", nine_D3DQUERYTYPE_to_str(type));
     const unsigned ptype = d3dquerytype_to_pipe_query(type);
-    
-    if ((ptype == PIPE_QUERY_TIMESTAMP) || 
+
+    if ((ptype == PIPE_QUERY_TIMESTAMP) ||
         (ptype == PIPE_QUERY_GPU_FINISHED)) {
         DBG("The query type %u (%s) does not support a call to begin_query.\n",
             type, nine_D3DQUERYTYPE_to_str(type));
         return D3DERR_NOTAVAILABLE;
     }
-    
+
     return D3D_OK;
 }
 
@@ -202,24 +202,24 @@ NineQuery9_Issue( struct NineQuery9 *This,
 
     if (dwIssueFlags == D3DISSUE_BEGIN) {
         if (This->state == NINE_QUERY_STATE_RUNNING) {
-	    pipe->end_query(pipe, This->pq);
-	}
+           pipe->end_query(pipe, This->pq);
+        }
 	if (nine_is_begin_query_available(This->type) == D3D_OK ) {
             pipe->begin_query(pipe, This->pq);
-	    This->state = NINE_QUERY_STATE_RUNNING;
-	}
-	else {
-	  return D3DERR_NOTAVAILABLE;
+            This->state = NINE_QUERY_STATE_RUNNING;
+        }
+        else {
+            return D3DERR_NOTAVAILABLE;
 	}
         
     } else {
         if ((This->state != NINE_QUERY_STATE_RUNNING) &&
             (nine_is_begin_query_available(This->type) == D3D_OK )){
-	    DBG("begin_query ok\n");
+            DBG("begin_query ok\n");
             pipe->begin_query(pipe, This->pq);
         }
         pipe->end_query(pipe, This->pq);
-	This->state = NINE_QUERY_STATE_ENDED;
+        This->state = NINE_QUERY_STATE_ENDED;
     }
     return D3D_OK;
 }

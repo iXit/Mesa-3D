@@ -241,7 +241,7 @@ NineQuery9_GetData( struct NineQuery9 *This,
     DBG("This=%p pData=%p dwSize=%d dwGetDataFlags=%d\n",
         This, pData, dwSize, dwGetDataFlags);
 
-    user_assert(This->state != NINE_QUERY_STATE_RUNNING, D3DERR_INVALIDCALL);
+    user_assert(This->state != NINE_QUERY_STATE_RUNNING, S_FALSE);
     user_assert(dwSize == 0 || pData, D3DERR_INVALIDCALL);
     user_assert(dwGetDataFlags == 0 ||
                 dwGetDataFlags == D3DGETDATA_FLUSH, D3DERR_INVALIDCALL);

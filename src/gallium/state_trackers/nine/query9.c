@@ -134,6 +134,15 @@ NineQuery9_ctor( struct NineQuery9 *This,
         if (!This->pq)
             return E_OUTOFMEMORY;
     } else {
+        /* we have a fallback when app create a query that is
+           not supported. Wine has different behaviour. It won't fill the
+           pointer with a valid NineQuery9, but let it NULL and return error.
+           However even if driver doesn't support D3DQUERYTYPE_EVENT, it
+           will say it is supported and have a fallback for it. Since we
+           support more queries than wine we may hit different rendering paths
+           than it, so perhaps these fallbacks are required.
+           TODO: someone with a lot of different games should try to see
+           if these dummy queries are needed. */
         DBG("Returning dummy NineQuery9 for %s.\n",
             nine_D3DQUERYTYPE_to_str(Type));
     }
@@ -185,9 +194,14 @@ NineQuery9_Issue( struct NineQuery9 *This,
 
     DBG("This=%p dwIssueFlags=%d\n", This, dwIssueFlags);
 
-    user_assert((dwIssueFlags == D3DISSUE_BEGIN && !This->instant) ||
+    user_assert((dwIssueFlags == D3DISSUE_BEGIN) ||
                 (dwIssueFlags == 0) ||
                 (dwIssueFlags == D3DISSUE_END), D3DERR_INVALIDCALL);
+
+    /* Wine tests: always return D3D_OK on D3DISSUE_BEGIN 
+     * even when the call is supposed to be forbidden */
+    if (dwIssueFlags == D3DISSUE_BEGIN && This->instant)
+        return D3D_OK;
 
     if (!This->pq) {
         DBG("Issued dummy query.\n");
@@ -233,7 +247,7 @@ NineQuery9_GetData( struct NineQuery9 *This,
                     DWORD dwGetDataFlags )
 {
     struct pipe_context *pipe = This->base.device->pipe;
-    boolean ok;
+    boolean ok, should_flush, should_wait;
     unsigned i;
     union pipe_query_result presult;
     union nine_query_result nresult;
@@ -248,22 +262,28 @@ NineQuery9_GetData( struct NineQuery9 *This,
 
     if (!This->pq) {
         DBG("No pipe query available.\n");
-    }
-    if (This->pq && This->state == NINE_QUERY_STATE_FRESH) {
-        /* App forgot issue the request. Be nice and issue it. */
-        (void) NineQuery9_Issue(This, D3DISSUE_END);
-    }
+    } else {
+        should_flush = dwGetDataFlags && This->state != NINE_QUERY_STATE_FLUSHED;
+        /* Wine tests: D3DQUERYTYPE_TIMESTAMP always succeeds
+         * directly when flushed */
+        should_wait = dwGetDataFlags && This->type == D3DQUERYTYPE_TIMESTAMP;
 
-    if (This->pq) {
-        ok = pipe->get_query_result(pipe, This->pq, FALSE, &presult);
-        if (!ok) {
-            if (dwGetDataFlags) {
-                if (This->state != NINE_QUERY_STATE_FLUSHED)
-                    pipe->flush(pipe, NULL, 0);
-                This->state = NINE_QUERY_STATE_FLUSHED;
-            }
-            return S_FALSE;
+        if (This->state == NINE_QUERY_STATE_FRESH) {
+            /* App forgot issue the request. Be nice and issue it. */
+            (void) NineQuery9_Issue(This, D3DISSUE_END);
+            /* Wine tests: we have to succeed. */
+            should_flush = TRUE;
+            should_wait = TRUE;
         }
+
+        if (should_flush) {
+            pipe->flush(pipe, NULL, 0);
+            This->state = NINE_QUERY_STATE_FLUSHED;
+        }
+
+        ok = pipe->get_query_result(pipe, This->pq, should_wait, &presult);
+        if (!ok)
+            return S_FALSE;
     }
     if (!dwSize)
         return S_OK;

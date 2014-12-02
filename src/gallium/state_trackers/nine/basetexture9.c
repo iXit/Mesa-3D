@@ -436,6 +436,10 @@ NineBaseTexture9_CreatePipeResource( struct NineBaseTexture9 *This,
     return D3D_OK;
 }
 
+#define SWIZZLE_TO_REPLACE(s) (s == UTIL_FORMAT_SWIZZLE_0 || \
+                               s == UTIL_FORMAT_SWIZZLE_1 || \
+                               s == UTIL_FORMAT_SWIZZLE_NONE)
+
 HRESULT
 NineBaseTexture9_UpdateSamplerView( struct NineBaseTexture9 *This,
                                     const int sRGB )
@@ -444,6 +448,7 @@ NineBaseTexture9_UpdateSamplerView( struct NineBaseTexture9 *This,
     struct pipe_context *pipe = This->pipe;
     struct pipe_resource *resource = This->base.resource;
     struct pipe_sampler_view templ;
+    unsigned i;
     uint8_t swizzle[4];
 
     DBG("This=%p sRGB=%d\n", This, sRGB);
@@ -463,20 +468,29 @@ NineBaseTexture9_UpdateSamplerView( struct NineBaseTexture9 *This,
     swizzle[3] = PIPE_SWIZZLE_ALPHA;
     desc = util_format_description(resource->format);
     if (desc->colorspace == UTIL_FORMAT_COLORSPACE_ZS) {
-        /* ZZZ1 -> 0Z01 (see end of docs/source/tgsi.rst)
-         * XXX: but it's wrong
-        swizzle[0] = PIPE_SWIZZLE_ZERO;
-        swizzle[2] = PIPE_SWIZZLE_ZERO; */
-    } else
-    if (desc->swizzle[0] == UTIL_FORMAT_SWIZZLE_X &&
-        desc->swizzle[3] == UTIL_FORMAT_SWIZZLE_1) {
-        /* R001/RG01 -> R111/RG11 */
-        if (desc->swizzle[1] == UTIL_FORMAT_SWIZZLE_0)
-            swizzle[1] = PIPE_SWIZZLE_ONE;
-        if (desc->swizzle[2] == UTIL_FORMAT_SWIZZLE_0)
-            swizzle[2] = PIPE_SWIZZLE_ONE;
+        /* msdn doc says default values are R = B = 0.0,
+         * A = 1.0. This implictly indicates the green channel
+         * is always filled with content. However games seem to
+         * look for depth in the r channel, like gallium does.
+         * Moreover it's what dx10 states. Thus reword the spec
+         * by: R should contain the depth if the format contains it,
+         * and G the stencil. R, G and B default values are 0.0, while
+         * A default value is 1.0 */
+        if (SWIZZLE_TO_REPLACE(desc->swizzle[0]))
+            swizzle[0] = PIPE_SWIZZLE_ZERO;
+        if (SWIZZLE_TO_REPLACE(desc->swizzle[1]))
+            swizzle[1] = PIPE_SWIZZLE_ZERO;
+        swizzle[2] = PIPE_SWIZZLE_ZERO;
+        swizzle[3] = PIPE_SWIZZLE_ONE;
+    } else if (resource->format != PIPE_FORMAT_A8_UNORM) {
+        /* A8 is the only exception that should have 0.0 as default values
+         * for RGB. It is already what gallium does. All the other ones
+         * should have 1.0 for non-defined values */
+        for (i = 0; i < 4; i++) {
+            if (SWIZZLE_TO_REPLACE(desc->swizzle[i]))
+                swizzle[i] = PIPE_SWIZZLE_ONE;
+        }
     }
-    /* but 000A remains unchanged */
 
     templ.format = sRGB ? util_format_srgb(resource->format) : resource->format;
     templ.u.tex.first_layer = 0;

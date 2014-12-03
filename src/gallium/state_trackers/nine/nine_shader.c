@@ -805,9 +805,21 @@ tx_src_param(struct shader_translator *tx, const struct sm1_src_param *param)
         } else {
             if (tx->version.major < 3) {
                 assert(!param->rel);
-                src = ureg_DECL_fs_input(tx->ureg, TGSI_SEMANTIC_COLOR,
-                                         param->idx,
-                                         TGSI_INTERPOLATE_PERSPECTIVE);
+                assert(param->idx < 2);
+                if (ureg_src_is_undef(tx->regs.vC[param->idx])) {
+                    src = ureg_DECL_fs_input(ureg,
+                                             TGSI_SEMANTIC_COLOR,
+                                             param->idx,
+                                             TGSI_INTERPOLATE_PERSPECTIVE);
+                    /* ps <= 2.0: diffuse and specular are clamped to [0, 1] */
+                    if (tx->version.major < 2 || tx->version.minor == 0) {
+                        tmp = tx_scratch(tx);
+                        ureg_MOV(ureg, ureg_saturate(tmp), src);
+                        tx->regs.vC[param->idx] = ureg_src(tmp);
+                    } else
+                        tx->regs.vC[param->idx] = src;
+                }
+                src = tx->regs.vC[param->idx];
             } else {
                 assert(!param->rel); /* TODO */
                 assert(param->idx < Elements(tx->regs.v));
@@ -1050,6 +1062,7 @@ _tx_dst_param(struct shader_translator *tx, const struct sm1_dst_param *param)
             tx->regs.oCol[param->idx] =
                ureg_DECL_output(tx->ureg, TGSI_SEMANTIC_COLOR, param->idx);
         dst = tx->regs.oCol[param->idx];
+        /* Note: This may be unnecessary */
         if (IS_VS && tx->version.major < 3)
             dst = ureg_saturate(dst);
         break;

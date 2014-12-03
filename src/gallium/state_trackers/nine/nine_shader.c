@@ -1912,6 +1912,29 @@ nine_tgsi_to_interp_mode(struct tgsi_declaration_semantic *sem)
     }
 }
 
+static void ps3_concat_inputs(struct shader_translator *tx,
+                              struct sm1_semantic *sem,
+                              struct ureg_src src)
+{
+    unsigned idx = sem->reg.idx;
+    struct ureg_src previous_reg = tx->regs.v[idx];
+    struct ureg_dst tmp = ureg_DECL_temporary(tx->ureg);
+    BYTE swizzle[4] = {TGSI_SWIZZLE_X, TGSI_SWIZZLE_Y, TGSI_SWIZZLE_Z, TGSI_SWIZZLE_W};
+    BYTE mask = sem->reg.mask;
+
+    assert (mask);
+    while (!(mask & 0x01)) {
+        swizzle[0] = swizzle[1];
+        swizzle[1] = swizzle[2];
+        swizzle[2] = swizzle[3];
+        mask = mask > 1;
+    }
+    ureg_MOV(tx->ureg, tmp, previous_reg);
+    ureg_MOV(tx->ureg, ureg_writemask(tmp, sem->reg.mask),
+             ureg_swizzle(src, swizzle[0], swizzle[1], swizzle[2], swizzle[3]));
+    tx->regs.v[idx] = ureg_src(tmp);
+}
+
 DECL_SPECIAL(DCL)
 {
     struct ureg_program *ureg = tx->ureg;
@@ -1919,6 +1942,7 @@ DECL_SPECIAL(DCL)
     boolean is_sampler;
     struct tgsi_declaration_semantic tgsi;
     struct sm1_semantic sem;
+    struct ureg_src src;
     sm1_read_semantic(tx, &sem);
 
     is_input = sem.reg.file == D3DSPR_INPUT;
@@ -1974,11 +1998,16 @@ DECL_SPECIAL(DCL)
         if (is_input && tx->version.major >= 3) {
             /* SM3 only, SM2 input semantic determined by file */
             assert(sem.reg.idx < Elements(tx->regs.v));
-            tx->regs.v[sem.reg.idx] = ureg_DECL_fs_input_cyl_centroid(
+            src = ureg_DECL_fs_input_cyl_centroid(
                 ureg, tgsi.Name, tgsi.Index,
                 nine_tgsi_to_interp_mode(&tgsi),
                 0, /* cylwrap */
                 sem.reg.mod & NINED3DSPDM_CENTROID);
+            if (sem.reg.mask == NINED3DSP_WRITEMASK_ALL ||
+                ureg_src_is_undef(tx->regs.v[sem.reg.idx]))
+                tx->regs.v[sem.reg.idx] = src;
+            else
+                ps3_concat_inputs(tx, &sem, src);
         } else
         if (!is_input && 0) { /* declare in COLOROUT/DEPTHOUT case */
             /* FragColor or FragDepth */

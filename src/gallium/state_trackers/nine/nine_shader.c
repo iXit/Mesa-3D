@@ -916,6 +916,23 @@ tx_src_param(struct shader_translator *tx, const struct sm1_src_param *param)
     if (param->rel)
         src = ureg_src_indirect(src, tx_src_param(tx, param->rel));
 
+    switch (param->mod) {
+    case NINED3DSPSM_DW:
+        tmp = tx_scratch(tx);
+        ureg_MOV(ureg, tmp, src);
+        ureg_DIV(ureg, tmp, ureg_src(tmp), ureg_swizzle(ureg_src(tmp), NINE_SWIZZLE4(W,W,W,W)));
+        src = ureg_src(tmp);
+        break;
+    case NINED3DSPSM_DZ:
+        tmp = tx_scratch(tx);
+        ureg_MOV(ureg, tmp, src);
+        ureg_DIV(ureg, tmp, ureg_src(tmp), ureg_swizzle(ureg_src(tmp), NINE_SWIZZLE4(Z,Z,Z,Z)));
+        src = ureg_src(tmp);
+        break;
+    default:
+        break;
+    }
+
     if (param->swizzle != NINED3DSP_NOSWIZZLE)
         src = ureg_swizzle(src,
                            (param->swizzle >> 0) & 0x3,
@@ -958,7 +975,7 @@ tx_src_param(struct shader_translator *tx, const struct sm1_src_param *param)
         break;
     case NINED3DSPSM_DZ:
     case NINED3DSPSM_DW:
-        /* handled in instruction */
+        /* Already handled*/
         break;
     case NINED3DSPSM_SIGN:
         tmp = tx_scratch(tx);
@@ -2038,7 +2055,8 @@ DECL_SPECIAL(TEXCOORD)
     struct ureg_dst dst = tx_dst_param(tx, &tx->insn.dst[0]);
 
     tx_texcoord_alloc(tx, s);
-    ureg_MOV(ureg, dst, tx->regs.vT[s]); /* XXX is this sufficient ? */
+    ureg_MOV(ureg, ureg_writemask(ureg_saturate(dst), TGSI_WRITEMASK_XYZ), tx->regs.vT[s]);
+    ureg_MOV(ureg, ureg_writemask(dst, TGSI_WRITEMASK_W), ureg_imm1f(tx->ureg, 1.0f));
 
     return D3D_OK;
 }
@@ -2046,11 +2064,12 @@ DECL_SPECIAL(TEXCOORD)
 DECL_SPECIAL(TEXCOORD_ps14)
 {
     struct ureg_program *ureg = tx->ureg;
-    const unsigned s = tx->insn.src[0].idx;
+    struct ureg_src src = tx_src_param(tx, &tx->insn.src[0]);
     struct ureg_dst dst = tx_dst_param(tx, &tx->insn.dst[0]);
 
-    tx_texcoord_alloc(tx, s);
-    ureg_MOV(ureg, dst, tx->regs.vT[s]); /* XXX is this sufficient ? */
+    assert(tx->insn.src[0].file == D3DSPR_TEXTURE);
+
+    ureg_MOV(ureg, dst, src);
 
     return D3D_OK;
 }

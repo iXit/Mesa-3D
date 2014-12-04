@@ -459,6 +459,9 @@ NineBaseTexture9_UpdateSamplerView( struct NineBaseTexture9 *This,
 	if (unlikely(This->format == D3DFMT_NULL))
             return D3D_OK;
         NineBaseTexture9_Dump(This);
+        /* horrible hack due to current broken state */
+        NineBaseTexture9_GenerateMipSubLevels(This);
+        resource = This->base.resource;
     }
     assert(resource);
 

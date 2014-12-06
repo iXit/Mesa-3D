@@ -851,9 +851,7 @@ tx_src_param(struct shader_translator *tx, const struct sm1_src_param *param)
     case D3DSPR_CONST2:
     case D3DSPR_CONST3:
     case D3DSPR_CONST4:
-        DBG("CONST2/3/4 should have been collapsed into D3DSPR_CONST !\n");
-        assert(!"CONST2/3/4");
-        src = ureg_imm1f(ureg, 0.0f);
+        assert(0);
         break;
     case D3DSPR_CONSTINT:
         /* relative adressing only possible for float constants in vs */
@@ -2639,9 +2637,9 @@ sm1_parse_src_param(struct sm1_src_param *src, DWORD tok)
     src->mod = (tok & D3DSP_SRCMOD_MASK) >> D3DSP_SRCMOD_SHIFT;
 
     switch (src->file) {
-    case D3DSPR_CONST2: src->file = D3DSPR_CONST; src->idx += 2048; break;
-    case D3DSPR_CONST3: src->file = D3DSPR_CONST; src->idx += 4096; break;
-    case D3DSPR_CONST4: src->file = D3DSPR_CONST; src->idx += 6144; break;
+    case D3DSPR_CONST2:
+    case D3DSPR_CONST3:
+    case D3DSPR_CONST4: assert(0);
     default:
         break;
     }

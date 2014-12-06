@@ -408,7 +408,8 @@ update_constants(struct NineDevice9 *device, unsigned shader_type)
         const_b = device->state.ps_const_b;
         b_true = device->ps_bool_true;
 
-        lconstf = &device->state.ps->lconstf;
+        lconstf->data = NULL;
+        lconstf->ranges = NULL;
         device->state.ff.clobber.ps_const = TRUE;
         device->state.changed.group &= ~NINE_STATE_PS_CONST;
     }
@@ -563,32 +564,7 @@ update_ps_constants_userbuf(struct NineDevice9 *device)
         state->changed.ps_const_b = 0;
     }
 
-#ifdef DEBUG
-    if (device->state.ps->lconstf.ranges) {
-        /* TODO: Can we make it so that we don't have to copy everything ? */
-        const struct nine_lconstf *lconstf =  &device->state.ps->lconstf;
-        const struct nine_range *r = lconstf->ranges;
-        unsigned n = 0;
-        float *dst = (float *)MALLOC(cb.buffer_size);
-        float *src = (float *)cb.user_buffer;
-        memcpy(dst, src, cb.buffer_size);
-        while (r) {
-            unsigned p = r->bgn;
-            unsigned c = r->end - r->bgn;
-            memcpy(&dst[p * 4], &lconstf->data[n * 4], c * 4 * sizeof(float));
-            n += c;
-            r = r->next;
-        }
-        cb.user_buffer = dst;
-    }
-#endif
-
     pipe->set_constant_buffer(pipe, PIPE_SHADER_FRAGMENT, 0, &cb);
-
-#ifdef DEBUG
-    if (device->state.ps->lconstf.ranges)
-        FREE((void *)cb.user_buffer);
-#endif
 
     if (device->state.changed.ps_const_f) {
         struct nine_range *r = device->state.changed.ps_const_f;

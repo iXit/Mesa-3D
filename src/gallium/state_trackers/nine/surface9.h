@@ -49,7 +49,8 @@ struct NineSurface9
 
     uint8_t *data; /* system memory backing */
     boolean manage_data;
-    unsigned stride; /* for system memory backing */
+    unsigned fake_stride; /* for system memory backing */
+    unsigned true_stride;
 
     /* wine doesn't even use these, 2 will be enough */
     struct u_rect dirty_rects[2];

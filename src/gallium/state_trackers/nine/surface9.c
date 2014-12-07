@@ -38,6 +38,24 @@
 
 #define DBG_CHANNEL DBG_SURFACE
 
+static unsigned nine_format_get_stride(enum pipe_format format, unsigned width)
+{
+    /* ATI1 and ATI2 hack: d3d9 runtime is supposed to act as if
+     * they are not compressed and the application workarounds that */
+    if (format == PIPE_FORMAT_RGTC1_UNORM || format == PIPE_FORMAT_RGTC2_UNORM)
+        return width;
+    return util_format_get_stride(format, width);
+}
+
+static unsigned nine_format_get_nblocksy(enum pipe_format format, unsigned height)
+{
+    /* ATI1 and ATI2 hack: d3d9 runtime is supposed to act as if
+     * they are not compressed and the application workarounds that */
+    if (format == PIPE_FORMAT_RGTC1_UNORM || format == PIPE_FORMAT_RGTC2_UNORM)
+        return height;
+    return util_format_get_nblocksy(format, height);
+}
+
 HRESULT
 NineSurface9_ctor( struct NineSurface9 *This,
                    struct NineUnknownParams *pParams,
@@ -106,12 +124,14 @@ NineSurface9_ctor( struct NineSurface9 *This,
     This->layer = Layer;
     This->desc = *pDesc;
 
-    This->stride = util_format_get_stride(This->base.info.format, pDesc->Width);
-    This->stride = align(This->stride, 4);
+    This->fake_stride = nine_format_get_stride(This->base.info.format, pDesc->Width);
+    This->fake_stride = align(This->fake_stride, 4);
+    This->true_stride = util_format_get_stride(This->base.info.format, pDesc->Width);
+    This->true_stride = align(This->true_stride, 4);
 
     if (!pResource && !This->data) {
-        const unsigned size = This->stride *
-            util_format_get_nblocksy(This->base.info.format, This->desc.Height);
+        const unsigned size = This->fake_stride *
+            nine_format_get_nblocksy(This->base.info.format, This->desc.Height);
 
         DBG("(%p(This=%p),level=%u) Allocating 0x%x bytes of system memory.\n",
             This->base.base.container, This, This->level, size);
@@ -190,7 +210,7 @@ NineSurface9_Dump( struct NineSurface9 *This )
         nine_D3DRTYPE_to_str(This->desc.Type),
         nine_D3DUSAGE_to_str(This->desc.Usage),
         This->desc.Width, This->desc.Height,
-        d3dformat_to_string(This->desc.Format), This->stride,
+        d3dformat_to_string(This->desc.Format), This->true_stride,
         This->base.resource &&
         (This->base.resource->flags & NINE_RESOURCE_FLAG_LOCKABLE),
         This->level, This->level_actual, This->layer);
@@ -302,12 +322,12 @@ NineSurface9_AddDirtyRect( struct NineSurface9 *This,
 static INLINE uint8_t *
 NineSurface9_GetSystemMemPointer(struct NineSurface9 *This, int x, int y)
 {
-    unsigned x_offset = util_format_get_stride(This->base.info.format, x);
+    unsigned x_offset = nine_format_get_stride(This->base.info.format, x);
 
-    y = util_format_get_nblocksy(This->base.info.format, y);
+    y = nine_format_get_nblocksy(This->base.info.format, y);
 
     assert(This->data);
-    return This->data + (y * This->stride + x_offset);
+    return This->data + (y * This->fake_stride + x_offset);
 }
 
 HRESULT WINAPI
@@ -383,7 +403,7 @@ NineSurface9_LockRect( struct NineSurface9 *This,
     if (This->data) {
         DBG("returning system memory\n");
 
-        pLockedRect->Pitch = This->stride;
+        pLockedRect->Pitch = This->fake_stride;
         pLockedRect->pBits = NineSurface9_GetSystemMemPointer(This,
                                                               box.x, box.y);
     } else {
@@ -550,7 +570,7 @@ NineSurface9_CopySurface( struct NineSurface9 *This,
 
         pipe->transfer_inline_write(pipe, r_dst, This->level,
                                     0, /* WRITE|DISCARD are implicit */
-                                    &dst_box, p_src, From->stride, 0);
+                                    &dst_box, p_src, From->true_stride, 0);
     } else
     if (r_src) {
         p_dst = NineSurface9_GetSystemMemPointer(This, 0, 0);
@@ -562,7 +582,7 @@ NineSurface9_CopySurface( struct NineSurface9 *This,
             return D3DERR_DRIVERINTERNALERROR;
 
         util_copy_rect(p_dst, This->base.info.format,
-                       This->stride, dst_box.x, dst_box.y,
+                       This->true_stride, dst_box.x, dst_box.y,
                        dst_box.width, dst_box.height,
                        p_src,
                        transfer->stride, src_box.x, src_box.y);
@@ -573,10 +593,10 @@ NineSurface9_CopySurface( struct NineSurface9 *This,
         p_src = NineSurface9_GetSystemMemPointer(From, 0, 0);
 
         util_copy_rect(p_dst, This->base.info.format,
-                       This->stride, dst_box.x, dst_box.y,
+                       This->fake_stride, dst_box.x, dst_box.y,
                        dst_box.width, dst_box.height,
                        p_src,
-                       From->stride, src_box.x, src_box.y);
+                       From->fake_stride, src_box.x, src_box.y);
     }
 
     if (This->base.pool == D3DPOOL_DEFAULT ||
@@ -616,7 +636,7 @@ NineSurface9_UploadSelf( struct NineSurface9 *This )
 
         pipe->transfer_inline_write(pipe, res, This->level,
                                     0,
-                                    &box, ptr, This->stride, 0);
+                                    &box, ptr, This->true_stride, 0);
     }
     NineSurface9_ClearDirtyRects(This);
 
@@ -637,9 +657,10 @@ NineSurface9_SetResourceResize( struct NineSurface9 *This,
     This->desc.Width = This->base.info.width0 = resource->width0;
     This->desc.Height = This->base.info.height0 = resource->height0;
 
-    This->stride = util_format_get_stride(This->base.info.format,
-                                          This->desc.Width);
-    This->stride = align(This->stride, 4);
+    This->fake_stride = nine_format_get_stride(This->base.info.format, This->desc.Width);
+    This->fake_stride = align(This->fake_stride, 4);
+    This->true_stride = util_format_get_stride(This->base.info.format, This->desc.Width);
+    This->true_stride = align(This->true_stride, 4);
 
     pipe_surface_reference(&This->surface[0], NULL);
     pipe_surface_reference(&This->surface[1], NULL);

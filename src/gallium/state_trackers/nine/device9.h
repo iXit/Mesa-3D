@@ -110,10 +110,13 @@ struct NineDevice9
     struct {
         boolean user_vbufs;
         boolean user_ibufs;
+        boolean user_cbufs;
         boolean window_space_position_support;
     } driver_caps;
 
-    struct u_upload_mgr *upload;
+    struct u_upload_mgr *vertex_uploader;
+    struct u_upload_mgr *index_uploader;
+    struct u_upload_mgr *constbuf_uploader;
 
     struct nine_range_pool range_pool;
 

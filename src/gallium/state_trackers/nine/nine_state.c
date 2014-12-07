@@ -33,6 +33,7 @@
 #include "pipe/p_context.h"
 #include "pipe/p_state.h"
 #include "cso_cache/cso_context.h"
+#include "util/u_upload_mgr.h"
 #include "util/u_math.h"
 
 #define DBG_CHANNEL DBG_DEVICE
@@ -476,6 +477,7 @@ update_vs_constants_userbuf(struct NineDevice9 *device)
     struct nine_state *state = &device->state;
     struct pipe_context *pipe = device->pipe;
     struct pipe_constant_buffer cb;
+    float *temp_buffer = NULL;
     cb.buffer = NULL;
     cb.buffer_offset = 0;
     cb.buffer_size = device->state.vs->const_used_size;
@@ -503,23 +505,34 @@ update_vs_constants_userbuf(struct NineDevice9 *device)
         const struct nine_lconstf *lconstf =  &device->state.vs->lconstf;
         const struct nine_range *r = lconstf->ranges;
         unsigned n = 0;
-        float *dst = (float *)MALLOC(cb.buffer_size);
         float *src = (float *)cb.user_buffer;
-        memcpy(dst, src, cb.buffer_size);
+        temp_buffer = (float *)MALLOC(cb.buffer_size);
+        memcpy(temp_buffer, src, cb.buffer_size);
         while (r) {
             unsigned p = r->bgn;
             unsigned c = r->end - r->bgn;
-            memcpy(&dst[p * 4], &lconstf->data[n * 4], c * 4 * sizeof(float));
+            memcpy(&temp_buffer[p * 4], &lconstf->data[n * 4], c * 4 * sizeof(float));
             n += c;
             r = r->next;
         }
-        cb.user_buffer = dst;
+        cb.user_buffer = temp_buffer;
+    }
+
+    if (!device->driver_caps.user_cbufs) {
+        u_upload_data(device->constbuf_uploader,
+                      0,
+                      cb.buffer_size,
+                      cb.user_buffer,
+                      &cb.buffer_offset,
+                      &cb.buffer);
+        u_upload_unmap(device->constbuf_uploader);
+        cb.user_buffer = NULL;
     }
 
     pipe->set_constant_buffer(pipe, PIPE_SHADER_VERTEX, 0, &cb);
 
-    if (device->state.vs->lconstf.ranges)
-        FREE((void *)cb.user_buffer);
+    if (temp_buffer)
+        FREE((void *)temp_buffer);
 
     if (device->state.changed.vs_const_f) {
         struct nine_range *r = device->state.changed.vs_const_f;
@@ -558,6 +571,17 @@ update_ps_constants_userbuf(struct NineDevice9 *device)
         for (i = 0; i < NINE_MAX_CONST_B; ++i)
             bdst[i] = state->ps_const_b[i] ? device->ps_bool_true : 0;
         state->changed.ps_const_b = 0;
+    }
+
+    if (!device->driver_caps.user_cbufs) {
+        u_upload_data(device->constbuf_uploader,
+                      0,
+                      cb.buffer_size,
+                      cb.user_buffer,
+                      &cb.buffer_offset,
+                      &cb.buffer);
+        u_upload_unmap(device->constbuf_uploader);
+        cb.user_buffer = NULL;
     }
 
     pipe->set_constant_buffer(pipe, PIPE_SHADER_FRAGMENT, 0, &cb);

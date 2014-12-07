@@ -778,21 +778,12 @@ NineAdapter9_GetDeviceCaps( struct NineAdapter9 *This,
 
     pCaps->VertexShaderVersion = sm3 ? D3DVS_VERSION(3,0) : D3DVS_VERSION(2,0);
     if (vs) {
-        /* VS 2 as well as 3.0 supports a minimum of 256 consts, no matter how
-         * much our architecture moans about it. The problem is that D3D9
-         * expects access to 16 int consts (i#), containing 3 components and
-         * 16 booleans (b#), containing only 1 component. This should be packed
-         * into 20 float vectors (16 for i# and 16/4 for b#), since gallium has
-         * removed support for the loop counter/boolean files. */
-        pCaps->MaxVertexShaderConst =
-            _min((screen->get_shader_param(screen, PIPE_SHADER_VERTEX,
-                     PIPE_SHADER_CAP_MAX_CONST_BUFFER_SIZE) /
-                     sizeof(float[4])) - 20,
-		 NINE_MAX_CONST_F);
-        /* Fake the minimum cap for Windows. */
-        if (QUIRK(FAKE_CAPS)) {
-            pCaps->MaxVertexShaderConst = 256;
-        }
+        /* VS 2 as well as 3.0 supports a minimum of 256 consts.
+         * Wine and d3d9 drivers for dx1x hw advertise 256. Just as them,
+         * advertise 256. Problem is with hw that can only do 256, because
+         * we need take a few slots for boolean and integer constants. For these
+         * we'll have to fail later if they use complex shaders. */
+        pCaps->MaxVertexShaderConst = NINE_MAX_CONST_F;
     } else {
         pCaps->MaxVertexShaderConst = 0;
     }

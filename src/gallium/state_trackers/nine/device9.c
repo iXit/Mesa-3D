@@ -256,14 +256,10 @@ NineDevice9_ctor( struct NineDevice9 *This,
     {
         unsigned max_const_vs, max_const_ps;
 
-        max_const_vs = _min(pScreen->get_shader_param(pScreen, PIPE_SHADER_VERTEX,
-                                PIPE_SHADER_CAP_MAX_CONST_BUFFER_SIZE) /
-                                sizeof(float[4]),
-                           NINE_MAX_CONST_ALL);
-        max_const_ps = _min(pScreen->get_shader_param(pScreen, PIPE_SHADER_FRAGMENT,
-                                PIPE_SHADER_CAP_MAX_CONST_BUFFER_SIZE) /
-                                sizeof(float[4]),
-                            NINE_MAX_CONST_ALL);
+        /* vs 3.0: >= 256 float constants */
+        max_const_vs = NINE_MAX_CONST_ALL;
+        /* ps 3.0: 224 float constants */
+        max_const_ps = 224 + (NINE_MAX_CONST_I + NINE_MAX_CONST_B / 4);
 
         This->max_vs_const_f = max_const_vs -
                                (NINE_MAX_CONST_I + NINE_MAX_CONST_B / 4);

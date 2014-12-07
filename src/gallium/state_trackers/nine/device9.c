@@ -62,7 +62,7 @@ NineDevice9_SetDefaultState( struct NineDevice9 *This, boolean is_reset )
 
     assert(!This->is_recording);
 
-    nine_state_set_defaults(&This->state, &This->caps, is_reset);
+    nine_state_set_defaults(This, &This->caps, is_reset);
 
     This->state.viewport.X = 0;
     This->state.viewport.Y = 0;

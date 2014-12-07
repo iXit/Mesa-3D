@@ -30,7 +30,6 @@ C_SOURCES := \
 	nineexoverlayextension.h \
 	nine_ff.c \
 	nine_ff.h \
-	nine_helpers.c \
 	nine_helpers.h \
 	nine_lock.c \
 	nine_lock.h \

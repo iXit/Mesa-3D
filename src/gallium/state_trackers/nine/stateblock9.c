@@ -55,8 +55,6 @@ void
 NineStateBlock9_dtor( struct NineStateBlock9 *This )
 {
     struct nine_state *state = &This->state;
-    struct nine_range *r;
-    struct nine_range_pool *pool = &This->base.device->range_pool;
 
     nine_state_clear(state, FALSE);
 
@@ -67,15 +65,6 @@ NineStateBlock9_dtor( struct NineStateBlock9 *This )
 
     FREE(state->ff.transform);
 
-    if (This->state.changed.ps_const_f) {
-        for (r = This->state.changed.ps_const_f; r->next; r = r->next);
-        nine_range_pool_put_chain(pool, This->state.changed.ps_const_f, r);
-    }
-    if (This->state.changed.vs_const_f) {
-        for (r = This->state.changed.vs_const_f; r->next; r = r->next);
-        nine_range_pool_put_chain(pool, This->state.changed.vs_const_f, r);
-    }
-
     NineUnknown_dtor(&This->base);
 }
 
@@ -84,11 +73,11 @@ NineStateBlock9_dtor( struct NineStateBlock9 *This )
  * TODO: compare ?
  */
 static void
-nine_state_copy_common(struct nine_state *dst,
+nine_state_copy_common(struct NineDevice9 *device,
+                       struct nine_state *dst,
                        const struct nine_state *src,
                        struct nine_state *mask, /* aliases either src or dst */
-                       const boolean apply,
-                       struct nine_range_pool *pool)
+                       const boolean apply)
 {
     unsigned i, s;
 
@@ -105,66 +94,33 @@ nine_state_copy_common(struct nine_state *dst,
     if (mask->changed.group & NINE_STATE_PS)
         nine_bind(&dst->ps, src->ps);
 
-    /* Vertex constants.
-     *
-     * Various possibilities for optimization here, like creating a per-SB
-     * constant buffer, or memcmp'ing for changes.
-     * Will do that later depending on what works best for specific apps.
-     */
+    /* Vertex constants. */
     if (mask->changed.group & NINE_STATE_VS_CONST) {
-        struct nine_range *r;
-        for (r = mask->changed.vs_const_f; r; r = r->next) {
-            memcpy(&dst->vs_const_f[r->bgn * 4],
-                   &src->vs_const_f[r->bgn * 4],
-                   (r->end - r->bgn) * 4 * sizeof(float));
-            if (apply)
-                nine_ranges_insert(&dst->changed.vs_const_f, r->bgn, r->end,
-                                   pool);
-        }
-        if (mask->changed.vs_const_i) {
-            uint16_t m = mask->changed.vs_const_i;
-            for (i = ffs(m) - 1, m >>= i; m; ++i, m >>= 1)
-                if (m & 1)
-                    memcpy(dst->vs_const_i[i], src->vs_const_i[i], 4 * sizeof(int));
-            if (apply)
-                dst->changed.vs_const_i |= mask->changed.vs_const_i;
-        }
-        if (mask->changed.vs_const_b) {
-            uint16_t m = mask->changed.vs_const_b;
-            for (i = ffs(m) - 1, m >>= i; m; ++i, m >>= 1)
-                if (m & 1)
-                    dst->vs_const_b[i] = src->vs_const_b[i];
-            if (apply)
-                dst->changed.vs_const_b |= mask->changed.vs_const_b;
+        if (mask->changed.vs_const_f)
+            memcpy(dst->vs_const_f, src->vs_const_f, device->max_vs_const_f * sizeof(float[4]));
+        if (mask->changed.vs_const_i)
+            memcpy(&dst->vs_const_i, &src->vs_const_i, sizeof(src->vs_const_i));
+        if (mask->changed.vs_const_b)
+            memcpy(&dst->vs_const_b, &src->vs_const_b, sizeof(src->vs_const_b));
+        if (apply) {
+            dst->changed.vs_const_f |= mask->changed.vs_const_f;
+            dst->changed.vs_const_i |= mask->changed.vs_const_i;
+            dst->changed.vs_const_b |= mask->changed.vs_const_b;
         }
     }
 
     /* Pixel constants. */
     if (mask->changed.group & NINE_STATE_PS_CONST) {
-        struct nine_range *r;
-        for (r = mask->changed.ps_const_f; r; r = r->next) {
-            memcpy(&dst->ps_const_f[r->bgn * 4],
-                   &src->ps_const_f[r->bgn * 4],
-                   (r->end - r->bgn) * 4 * sizeof(float));
-            if (apply)
-                nine_ranges_insert(&dst->changed.ps_const_f, r->bgn, r->end,
-                                   pool);
-        }
-        if (mask->changed.ps_const_i) {
-            uint16_t m = mask->changed.ps_const_i;
-            for (i = ffs(m) - 1, m >>= i; m; ++i, m >>= 1)
-                if (m & 1)
-                    memcpy(dst->ps_const_i[i], src->ps_const_i[i], 4 * sizeof(int));
-            if (apply)
-                dst->changed.ps_const_i |= mask->changed.ps_const_i;
-        }
-        if (mask->changed.ps_const_b) {
-            uint16_t m = mask->changed.ps_const_b;
-            for (i = ffs(m) - 1, m >>= i; m; ++i, m >>= 1)
-                if (m & 1)
-                    dst->ps_const_b[i] = src->ps_const_b[i];
-            if (apply)
-                dst->changed.ps_const_b |= mask->changed.ps_const_b;
+        if (mask->changed.ps_const_f)
+            memcpy(dst->ps_const_f, src->ps_const_f, device->max_ps_const_f * sizeof(float[4]));
+        if (mask->changed.ps_const_i)
+            memcpy(&dst->ps_const_i, &src->ps_const_i, sizeof(src->ps_const_i));
+        if (mask->changed.ps_const_b)
+            memcpy(&dst->ps_const_b, &src->ps_const_b, sizeof(src->ps_const_b));
+        if (apply) {
+            dst->changed.ps_const_f |= mask->changed.ps_const_f;
+            dst->changed.ps_const_i |= mask->changed.ps_const_i;
+            dst->changed.ps_const_b |= mask->changed.ps_const_b;
         }
     }
 
@@ -295,11 +251,11 @@ nine_state_copy_common(struct nine_state *dst,
 }
 
 static void
-nine_state_copy_common_all(struct nine_state *dst,
+nine_state_copy_common_all(struct NineDevice9 *device,
+                           struct nine_state *dst,
                            const struct nine_state *src,
                            struct nine_state *help,
                            const boolean apply,
-                           struct nine_range_pool *pool,
                            const int MaxStreams)
 {
     unsigned i;
@@ -313,22 +269,13 @@ nine_state_copy_common_all(struct nine_state *dst,
     nine_bind(&dst->vs, src->vs);
     nine_bind(&dst->ps, src->ps);
 
-    /* Vertex constants.
-     *
-     * Various possibilities for optimization here, like creating a per-SB
-     * constant buffer, or memcmp'ing for changes.
-     * Will do that later depending on what works best for specific apps.
-     */
+    /* Vertex constants. */
     if (1) {
-        struct nine_range *r = help->changed.vs_const_f;
-        memcpy(&dst->vs_const_f[0],
-               &src->vs_const_f[0], (r->end - r->bgn) * 4 * sizeof(float));
-        if (apply)
-            nine_ranges_insert(&dst->changed.vs_const_f, r->bgn, r->end, pool);
-
-        memcpy(dst->vs_const_i, src->vs_const_i, sizeof(dst->vs_const_i));
-        memcpy(dst->vs_const_b, src->vs_const_b, sizeof(dst->vs_const_b));
+        memcpy(dst->vs_const_f, src->vs_const_f, device->max_vs_const_f * sizeof(float[4]));
+        memcpy(&dst->vs_const_i, &src->vs_const_i, sizeof(src->vs_const_i));
+        memcpy(&dst->vs_const_b, &src->vs_const_b, sizeof(src->vs_const_b));
         if (apply) {
+            dst->changed.vs_const_f |= src->changed.vs_const_f;
             dst->changed.vs_const_i |= src->changed.vs_const_i;
             dst->changed.vs_const_b |= src->changed.vs_const_b;
         }
@@ -336,15 +283,11 @@ nine_state_copy_common_all(struct nine_state *dst,
 
     /* Pixel constants. */
     if (1) {
-        struct nine_range *r = help->changed.ps_const_f;
-        memcpy(&dst->ps_const_f[0],
-               &src->ps_const_f[0], (r->end - r->bgn) * 4 * sizeof(float));
-        if (apply)
-            nine_ranges_insert(&dst->changed.ps_const_f, r->bgn, r->end, pool);
-
-        memcpy(dst->ps_const_i, src->ps_const_i, sizeof(dst->ps_const_i));
-        memcpy(dst->ps_const_b, src->ps_const_b, sizeof(dst->ps_const_b));
+        memcpy(dst->ps_const_f, src->ps_const_f, device->max_ps_const_f * sizeof(float[4]));
+        memcpy(&dst->ps_const_i, &src->ps_const_i, sizeof(src->ps_const_i));
+        memcpy(&dst->ps_const_b, &src->ps_const_b, sizeof(src->ps_const_b));
         if (apply) {
+            dst->changed.ps_const_f |= src->changed.ps_const_f;
             dst->changed.ps_const_i |= src->changed.ps_const_i;
             dst->changed.ps_const_b |= src->changed.ps_const_b;
         }
@@ -448,9 +391,9 @@ NineStateBlock9_Capture( struct NineStateBlock9 *This )
     DBG("This=%p\n", This);
 
     if (This->type == NINESBT_ALL)
-        nine_state_copy_common_all(dst, src, dst, FALSE, NULL, MaxStreams);
+        nine_state_copy_common_all(This->base.device, dst, src, dst, FALSE, MaxStreams);
     else
-        nine_state_copy_common(dst, src, dst, FALSE, NULL);
+        nine_state_copy_common(This->base.device, dst, src, dst, FALSE);
 
     if (dst->changed.group & NINE_STATE_VDECL)
         nine_bind(&dst->vdecl, src->vdecl);
@@ -472,16 +415,15 @@ NineStateBlock9_Apply( struct NineStateBlock9 *This )
 {
     struct nine_state *dst = &This->base.device->state;
     struct nine_state *src = &This->state;
-    struct nine_range_pool *pool = &This->base.device->range_pool;
     const int MaxStreams = This->base.device->caps.MaxStreams;
     unsigned s;
 
     DBG("This=%p\n", This);
 
     if (This->type == NINESBT_ALL)
-        nine_state_copy_common_all(dst, src, src, TRUE, pool, MaxStreams);
+        nine_state_copy_common_all(This->base.device, dst, src, src, TRUE, MaxStreams);
     else
-        nine_state_copy_common(dst, src, src, TRUE, pool);
+        nine_state_copy_common(This->base.device, dst, src, src, TRUE);
 
     if ((src->changed.group & NINE_STATE_VDECL) && src->vdecl)
         nine_bind(&dst->vdecl, src->vdecl);

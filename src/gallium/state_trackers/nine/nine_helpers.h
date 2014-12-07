@@ -144,33 +144,5 @@ struct nine_range
     int16_t end; /* exclusive */
 };
 
-/* We won't ever need more than 256 ranges, so just allocate once. */
-struct nine_range_pool
-{
-    struct nine_range *free;
-    struct nine_range **slabs;
-    unsigned num_slabs;
-    unsigned num_slabs_max;
-};
-
-static INLINE void
-nine_range_pool_put(struct nine_range_pool *pool, struct nine_range *r)
-{
-    r->next = pool->free;
-    pool->free = r;
-}
-
-static INLINE void
-nine_range_pool_put_chain(struct nine_range_pool *pool,
-                          struct nine_range *head,
-                          struct nine_range *tail)
-{
-    tail->next = pool->free;
-    pool->free = head;
-}
-
-void
-nine_ranges_insert(struct nine_range **head, int16_t bgn, int16_t end,
-                   struct nine_range_pool *pool);
 
 #endif /* _NINE_HELPERS_H_ */

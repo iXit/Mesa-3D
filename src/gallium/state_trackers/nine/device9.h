@@ -116,8 +116,6 @@ struct NineDevice9
     struct u_upload_mgr *index_uploader;
     struct u_upload_mgr *constbuf_uploader;
 
-    struct nine_range_pool range_pool;
-
     struct hud_context *hud; /* NULL if hud is disabled */
 };
 static INLINE struct NineDevice9 *

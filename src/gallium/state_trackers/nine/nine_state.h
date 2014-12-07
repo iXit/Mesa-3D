@@ -115,12 +115,12 @@ struct nine_state
         uint32_t stream_freq;
         uint32_t texture;
         uint16_t sampler[NINE_MAX_SAMPLERS];
-        struct nine_range *vs_const_f;
-        struct nine_range *ps_const_f;
-        uint16_t vs_const_i; /* NINE_MAX_CONST_I == 16 */
-        uint16_t ps_const_i;
-        uint16_t vs_const_b; /* NINE_MAX_CONST_B == 16 */
-        uint16_t ps_const_b;
+        BOOL vs_const_f;
+        BOOL ps_const_f;
+        BOOL vs_const_i;
+        BOOL ps_const_i;
+        BOOL vs_const_b;
+        BOOL ps_const_b;
         uint8_t ucp;
     } changed;
 

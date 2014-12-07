@@ -350,7 +350,7 @@ update_vs_constants_userbuf(struct NineDevice9 *device)
     if (state->changed.vs_const_i) {
         int *idst = (int *)&state->vs_const_f[4 * device->max_vs_const_f];
         memcpy(idst, state->vs_const_i, sizeof(state->vs_const_i));
-        state->changed.vs_const_i = 0;
+        state->changed.vs_const_i = FALSE;
     }
     if (state->changed.vs_const_b) {
         int *idst = (int *)&state->vs_const_f[4 * device->max_vs_const_f];
@@ -358,7 +358,7 @@ update_vs_constants_userbuf(struct NineDevice9 *device)
         int i;
         for (i = 0; i < NINE_MAX_CONST_B; ++i)
             bdst[i] = state->vs_const_b[i] ? device->vs_bool_true : 0;
-        state->changed.vs_const_b = 0;
+        state->changed.vs_const_b = FALSE;
     }
 
     if (device->state.vs->lconstf.ranges) {
@@ -395,14 +395,7 @@ update_vs_constants_userbuf(struct NineDevice9 *device)
     if (temp_buffer)
         FREE((void *)temp_buffer);
 
-    if (device->state.changed.vs_const_f) {
-        struct nine_range *r = device->state.changed.vs_const_f;
-        struct nine_range *p = r;
-        while (p->next)
-            p = p->next;
-        nine_range_pool_put_chain(&device->range_pool, r, p);
-        device->state.changed.vs_const_f = NULL;
-    }
+    device->state.changed.vs_const_f = FALSE;
     state->changed.group &= ~NINE_STATE_VS_CONST;
 }
 
@@ -423,7 +416,7 @@ update_ps_constants_userbuf(struct NineDevice9 *device)
     if (state->changed.ps_const_i) {
         int *idst = (int *)&state->ps_const_f[4 * device->max_ps_const_f];
         memcpy(idst, state->ps_const_i, sizeof(state->ps_const_i));
-        state->changed.ps_const_i = 0;
+        state->changed.ps_const_i = FALSE;
     }
     if (state->changed.ps_const_b) {
         int *idst = (int *)&state->ps_const_f[4 * device->max_ps_const_f];
@@ -431,7 +424,7 @@ update_ps_constants_userbuf(struct NineDevice9 *device)
         int i;
         for (i = 0; i < NINE_MAX_CONST_B; ++i)
             bdst[i] = state->ps_const_b[i] ? device->ps_bool_true : 0;
-        state->changed.ps_const_b = 0;
+        state->changed.ps_const_b = FALSE;
     }
 
     if (!device->driver_caps.user_cbufs) {
@@ -447,14 +440,7 @@ update_ps_constants_userbuf(struct NineDevice9 *device)
 
     pipe->set_constant_buffer(pipe, PIPE_SHADER_FRAGMENT, 0, &cb);
 
-    if (device->state.changed.ps_const_f) {
-        struct nine_range *r = device->state.changed.ps_const_f;
-        struct nine_range *p = r;
-        while (p->next)
-            p = p->next;
-        nine_range_pool_put_chain(&device->range_pool, r, p);
-        device->state.changed.ps_const_f = NULL;
-    }
+    device->state.changed.ps_const_f = FALSE;
     state->changed.group &= ~NINE_STATE_PS_CONST;
 }
 

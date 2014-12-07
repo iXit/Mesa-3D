@@ -183,10 +183,6 @@ struct nine_state
             uint32_t tex_stage[NINE_MAX_SAMPLERS][(NINED3DTSS_COUNT + 31) / 32];
             uint32_t transform[(NINED3DTS_COUNT + 31) / 32];
         } changed;
-        struct {
-            boolean vs_const;
-            boolean ps_const;
-        } clobber;
 
         D3DMATRIX *transform; /* access only via nine_state_access_transform */
         unsigned num_transforms;

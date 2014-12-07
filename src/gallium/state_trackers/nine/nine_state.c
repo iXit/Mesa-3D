@@ -327,150 +327,6 @@ update_ps(struct NineDevice9 *device)
     return 0;
 }
 
-#define DO_UPLOAD_CONST_F(buf,p,c,d) \
-    do { \
-        DBG("upload ConstantF [%u .. %u]\n", x, (x) + (c) - 1); \
-        box.x = (p) * 4 * sizeof(float); \
-        box.width = (c) * 4 * sizeof(float); \
-        pipe->transfer_inline_write(pipe, buf, 0, usage, &box, &((d)[p * 4]), \
-                                    0, 0); \
-    } while(0)
-
-/* OK, this is a bit ugly ... */
-static void
-update_constants(struct NineDevice9 *device, unsigned shader_type)
-{
-    struct pipe_context *pipe = device->pipe;
-    struct pipe_resource *buf;
-    struct pipe_box box;
-    const void *data;
-    const float *const_f;
-    const int *const_i;
-    const BOOL *const_b;
-    uint32_t data_b[NINE_MAX_CONST_B];
-    uint32_t b_true;
-    uint16_t dirty_i;
-    uint16_t dirty_b;
-    const unsigned usage = PIPE_TRANSFER_WRITE | PIPE_TRANSFER_DISCARD_RANGE;
-    unsigned x = 0; /* silence warning */
-    unsigned i, c, n;
-    const struct nine_lconstf *lconstf;
-    struct nine_range *r, *p;
-
-    box.y = 0;
-    box.z = 0;
-    box.height = 1;
-    box.depth = 1;
-
-    if (shader_type == PIPE_SHADER_VERTEX) {
-        DBG("VS\n");
-        buf = device->constbuf_vs;
-
-        const_f = device->state.vs_const_f;
-        for (p = r = device->state.changed.vs_const_f; r; p = r, r = r->next)
-            DO_UPLOAD_CONST_F(buf, r->bgn, r->end - r->bgn, const_f);
-        if (p) {
-            nine_range_pool_put_chain(&device->range_pool,
-                                      device->state.changed.vs_const_f, p);
-            device->state.changed.vs_const_f = NULL;
-        }
-
-        dirty_i = device->state.changed.vs_const_i;
-        device->state.changed.vs_const_i = 0;
-        const_i = &device->state.vs_const_i[0][0];
-
-        dirty_b = device->state.changed.vs_const_b;
-        device->state.changed.vs_const_b = 0;
-        const_b = device->state.vs_const_b;
-        b_true = device->vs_bool_true;
-
-        lconstf = &device->state.vs->lconstf;
-        device->state.ff.clobber.vs_const = TRUE;
-        device->state.changed.group &= ~NINE_STATE_VS_CONST;
-    } else {
-        DBG("PS\n");
-        buf = device->constbuf_ps;
-
-        const_f = device->state.ps_const_f;
-        for (p = r = device->state.changed.ps_const_f; r; p = r, r = r->next)
-            DO_UPLOAD_CONST_F(buf, r->bgn, r->end - r->bgn, const_f);
-        if (p) {
-            nine_range_pool_put_chain(&device->range_pool,
-                                      device->state.changed.ps_const_f, p);
-            device->state.changed.ps_const_f = NULL;
-        }
-
-        dirty_i = device->state.changed.ps_const_i;
-        device->state.changed.ps_const_i = 0;
-        const_i = &device->state.ps_const_i[0][0];
-
-        dirty_b = device->state.changed.ps_const_b;
-        device->state.changed.ps_const_b = 0;
-        const_b = device->state.ps_const_b;
-        b_true = device->ps_bool_true;
-
-        lconstf->data = NULL;
-        lconstf->ranges = NULL;
-        device->state.ff.clobber.ps_const = TRUE;
-        device->state.changed.group &= ~NINE_STATE_PS_CONST;
-    }
-
-    /* write range from min to max changed, it's not much data */
-    /* bool1 */
-    if (dirty_b) {
-       c = util_last_bit(dirty_b);
-       i = ffs(dirty_b) - 1;
-       x = buf->width0 - (NINE_MAX_CONST_B - i) * 4;
-       c -= i;
-       for (n = 0; n < c; ++n, ++i)
-          data_b[n] = const_b[i] ? b_true : 0;
-       box.x = x;
-       box.width = n * 4;
-       DBG("upload ConstantB [%u .. %u]\n", x, x + n - 1);
-       pipe->transfer_inline_write(pipe, buf, 0, usage, &box, data_b, 0, 0);
-    }
-
-    /* int4 */
-    for (c = 0, i = 0; dirty_i; i++, dirty_i >>= 1) {
-        if (dirty_i & 1) {
-            if (!c)
-                x = i;
-            ++c;
-        } else
-        if (c) {
-            DBG("upload ConstantI [%u .. %u]\n", x, x + c - 1);
-            data = &const_i[x * 4];
-            box.x  = buf->width0 - (NINE_MAX_CONST_I * 4 + NINE_MAX_CONST_B) * 4;
-            box.x += x * 4 * sizeof(int);
-            box.width = c * 4 * sizeof(int);
-            c = 0;
-            pipe->transfer_inline_write(pipe, buf, 0, usage, &box, data, 0, 0);
-        }
-    }
-    if (c) {
-        DBG("upload ConstantI [%u .. %u]\n", x, x + c - 1);
-        data = &const_i[x * 4];
-        box.x  = buf->width0 - (NINE_MAX_CONST_I * 4 + NINE_MAX_CONST_B) * 4;
-        box.x += x * 4 * sizeof(int);
-        box.width = c * 4 * sizeof(int);
-        pipe->transfer_inline_write(pipe, buf, 0, usage, &box, data, 0, 0);
-    }
-
-    /* TODO: only upload these when shader itself changes */
-    if (lconstf->ranges) {
-        unsigned n = 0;
-        struct nine_range *r = lconstf->ranges;
-        while (r) {
-            box.x = r->bgn * 4 * sizeof(float);
-            n += r->end - r->bgn;
-            box.width = (r->end - r->bgn) * 4 * sizeof(float);
-            data = &lconstf->data[4 * n];
-            pipe->transfer_inline_write(pipe, buf, 0, usage, &box, data, 0, 0);
-            r = r->next;
-        }
-    }
-}
-
 static void
 update_vs_constants_userbuf(struct NineDevice9 *device)
 {
@@ -849,17 +705,10 @@ nine_update_state(struct NineDevice9 *device, uint32_t mask)
             state->changed.stream_freq & ~1)
             update_vertex_elements(device);
 
-        if (device->prefer_user_constbuf) {
-            if ((group & (NINE_STATE_VS_CONST | NINE_STATE_VS)) && state->vs)
-                update_vs_constants_userbuf(device);
-            if ((group & (NINE_STATE_PS_CONST | NINE_STATE_PS)) && state->ps)
-                update_ps_constants_userbuf(device);
-        } else {
-            if ((group & NINE_STATE_VS_CONST) && state->vs)
-                update_constants(device, PIPE_SHADER_VERTEX);
-            if ((group & NINE_STATE_PS_CONST) && state->ps)
-                update_constants(device, PIPE_SHADER_FRAGMENT);
-        }
+        if ((group & (NINE_STATE_VS_CONST | NINE_STATE_VS)) && state->vs)
+            update_vs_constants_userbuf(device);
+        if ((group & (NINE_STATE_PS_CONST | NINE_STATE_PS)) && state->ps)
+            update_ps_constants_userbuf(device);
     }
     if (state->changed.vtxbuf)
         update_vertex_buffers(device);

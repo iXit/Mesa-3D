@@ -101,42 +101,32 @@ NineDevice9_RestoreNonCSOState( struct NineDevice9 *This, unsigned mask )
     if (mask & 0x1) {
         struct pipe_constant_buffer cb;
         cb.buffer_offset = 0;
-        cb.buffer_size = This->constbuf_vs->width0;
-
-        if (This->prefer_user_constbuf) {
-            cb.buffer = NULL;
-            cb.user_buffer = This->state.vs_const_f;
-            if (!This->driver_caps.user_cbufs) {
-                u_upload_data(This->constbuf_uploader,
-                              0,
-                              cb.buffer_size,
-                              cb.user_buffer,
-                              &cb.buffer_offset,
-                              &cb.buffer);
-                u_upload_unmap(This->constbuf_uploader);
-                cb.user_buffer = NULL;
-            }
-        } else {
-            cb.buffer = This->constbuf_vs;
+        cb.buffer = NULL;
+        cb.user_buffer = This->state.vs_const_f;
+        cb.buffer_size = This->vs_const_size;
+        if (!This->driver_caps.user_cbufs) {
+            u_upload_data(This->constbuf_uploader,
+                          0,
+                          cb.buffer_size,
+                          cb.user_buffer,
+                          &cb.buffer_offset,
+                          &cb.buffer);
+            u_upload_unmap(This->constbuf_uploader);
             cb.user_buffer = NULL;
         }
         pipe->set_constant_buffer(pipe, PIPE_SHADER_VERTEX, 0, &cb);
 
-        cb.buffer_size = This->constbuf_ps->width0;
-        if (This->prefer_user_constbuf) {
-            cb.user_buffer = This->state.ps_const_f;
-            if (!This->driver_caps.user_cbufs) {
-                u_upload_data(This->constbuf_uploader,
-                              0,
-                              cb.buffer_size,
-                              cb.user_buffer,
-                              &cb.buffer_offset,
-                              &cb.buffer);
-                u_upload_unmap(This->constbuf_uploader);
-                cb.user_buffer = NULL;
-            }
-        } else {
-            cb.buffer = This->constbuf_ps;
+        cb.user_buffer = This->state.ps_const_f;
+        cb.buffer_size = This->ps_const_size;
+        if (!This->driver_caps.user_cbufs) {
+            u_upload_data(This->constbuf_uploader,
+                          0,
+                          cb.buffer_size,
+                          cb.user_buffer,
+                          &cb.buffer_offset,
+                          &cb.buffer);
+            u_upload_unmap(This->constbuf_uploader);
+            cb.user_buffer = NULL;
         }
         pipe->set_constant_buffer(pipe, PIPE_SHADER_FRAGMENT, 0, &cb);
     }
@@ -263,15 +253,13 @@ NineDevice9_ctor( struct NineDevice9 *This,
             return D3DERR_OUTOFVIDEOMEMORY;
     }
 
-    /* Create constant buffers. */
     {
-        struct pipe_resource tmpl;
         unsigned max_const_vs, max_const_ps;
 
         max_const_vs = _min(pScreen->get_shader_param(pScreen, PIPE_SHADER_VERTEX,
                                 PIPE_SHADER_CAP_MAX_CONST_BUFFER_SIZE) /
                                 sizeof(float[4]),
-			    NINE_MAX_CONST_ALL);
+                           NINE_MAX_CONST_ALL);
         max_const_ps = _min(pScreen->get_shader_param(pScreen, PIPE_SHADER_FRAGMENT,
                                 PIPE_SHADER_CAP_MAX_CONST_BUFFER_SIZE) /
                                 sizeof(float[4]),
@@ -281,35 +269,13 @@ NineDevice9_ctor( struct NineDevice9 *This,
                                (NINE_MAX_CONST_I + NINE_MAX_CONST_B / 4);
         This->max_ps_const_f = max_const_ps -
                                (NINE_MAX_CONST_I + NINE_MAX_CONST_B / 4);
+        This->vs_const_size = max_const_vs * sizeof(float[4]);
+        This->ps_const_size = max_const_ps * sizeof(float[4]);
 
         /* Include space for I,B constants for user constbuf. */
-        This->state.vs_const_f = CALLOC(NINE_MAX_CONST_ALL, sizeof(float[4]));
-        This->state.ps_const_f = CALLOC(NINE_MAX_CONST_ALL, sizeof(float[4]));
+        This->state.vs_const_f = CALLOC(This->vs_const_size, 1);
+        This->state.ps_const_f = CALLOC(This->ps_const_size, 1);
         if (!This->state.vs_const_f || !This->state.ps_const_f)
-            return E_OUTOFMEMORY;
-
-        if (strstr(pScreen->get_name(pScreen), "AMD") ||
-            strstr(pScreen->get_name(pScreen), "ATI"))
-            This->prefer_user_constbuf = TRUE;
-
-        tmpl.target = PIPE_BUFFER;
-        tmpl.format = PIPE_FORMAT_R8_UNORM;
-        tmpl.height0 = 1;
-        tmpl.depth0 = 1;
-        tmpl.array_size = 1;
-        tmpl.last_level = 0;
-        tmpl.nr_samples = 0;
-        tmpl.usage = PIPE_USAGE_DYNAMIC;
-        tmpl.bind = PIPE_BIND_CONSTANT_BUFFER;
-        tmpl.flags = 0;
-
-        tmpl.width0 = max_const_vs * sizeof(float[4]);
-        This->constbuf_vs = pScreen->resource_create(pScreen, &tmpl);
-
-        tmpl.width0 = max_const_ps * sizeof(float[4]);
-        This->constbuf_ps = pScreen->resource_create(pScreen, &tmpl);
-
-        if (!This->constbuf_vs || !This->constbuf_ps)
             return E_OUTOFMEMORY;
     }
 
@@ -374,8 +340,6 @@ NineDevice9_dtor( struct NineDevice9 *This )
 
     nine_bind(&This->record, NULL);
 
-    pipe_resource_reference(&This->constbuf_vs, NULL);
-    pipe_resource_reference(&This->constbuf_ps, NULL);
     FREE(This->state.vs_const_f);
     FREE(This->state.ps_const_f);
 

@@ -48,7 +48,9 @@ struct NineVertexShader9
     boolean position_t; /* if true, disable vport transform */
     boolean point_size; /* if true, set rasterizer.point_size_per_vertex to 1 */
 
-    unsigned const_used_size; /* in bytes */
+    unsigned num_float_consts_slots;
+    unsigned num_int_consts_slots;
+    unsigned num_bool_consts_slots;
 
     struct nine_lconstf lconstf;
 

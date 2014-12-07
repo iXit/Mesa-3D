@@ -2816,7 +2816,9 @@ tx_ctor(struct shader_translator *tx, struct nine_shader_info *info)
     info->position_t = FALSE;
     info->point_size = FALSE;
 
-    tx->info->const_used_size = 0;
+    tx->info->num_float_consts_slots = 0;
+    tx->info->num_int_consts_slots = 0;
+    tx->info->num_bool_consts_slots = 0;
 
     info->sampler_mask = 0x0;
     info->rt_mask = 0x0;
@@ -3018,7 +3020,7 @@ nine_translate_shader(struct NineDevice9 *device, struct nine_shader_info *info)
     }
 
     if (tx->indirect_const_access)
-        info->const_used_size = ~0;
+        info->num_float_consts_slots = NINE_MAX_CONST_F;
 
     info->cso = ureg_create_shader_and_destroy(tx->ureg, device->pipe);
     if (!info->cso) {

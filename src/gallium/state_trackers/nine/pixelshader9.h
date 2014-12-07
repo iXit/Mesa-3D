@@ -39,7 +39,9 @@ struct NinePixelShader9
         uint8_t version; /* (major << 4) | minor */
     } byte_code;
 
-    unsigned const_used_size; /* in bytes */
+    unsigned num_float_consts_slots;
+    unsigned num_int_consts_slots;
+    unsigned num_bool_consts_slots;
 
     uint16_t sampler_mask;
     uint16_t sampler_mask_shadow;

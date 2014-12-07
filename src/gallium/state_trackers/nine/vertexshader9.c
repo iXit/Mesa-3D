@@ -71,9 +71,9 @@ NineVertexShader9_ctor( struct NineVertexShader9 *This,
     This->byte_code.size = info.byte_size;
 
     This->variant.cso = info.cso;
-    This->const_used_size = info.const_used_size;
-    if (info.const_used_size == ~0)
-        This->const_used_size = NINE_CONSTBUF_SIZE(device->max_vs_const_f);
+    This->num_float_consts_slots = info.num_float_consts_slots;
+    This->num_int_consts_slots = info.num_int_consts_slots;
+    This->num_bool_consts_slots = info.num_bool_consts_slots;
     This->lconstf = info.lconstf;
     This->sampler_mask = info.sampler_mask;
     This->position_t = info.position_t;

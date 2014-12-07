@@ -327,6 +327,11 @@ update_ps(struct NineDevice9 *device)
     return 0;
 }
 
+#define DETERMINE_CONSTBUFFER_SIZE(device, s) \
+    s->num_bool_consts_slots > 0 ? NINE_CONST_B_BASE(device->max_vs_const_f) + s->num_bool_consts_slots : \
+    s->num_int_consts_slots > 0 ? NINE_CONST_I_BASE(device->max_vs_const_f) + s->num_int_consts_slots * 4 * sizeof(int) : \
+    s->num_float_consts_slots * 4 * sizeof(float)
+
 static void
 update_vs_constants_userbuf(struct NineDevice9 *device)
 {
@@ -336,7 +341,7 @@ update_vs_constants_userbuf(struct NineDevice9 *device)
     float *temp_buffer = NULL;
     cb.buffer = NULL;
     cb.buffer_offset = 0;
-    cb.buffer_size = device->state.vs->const_used_size;
+    cb.buffer_size = DETERMINE_CONSTBUFFER_SIZE(device, device->state.vs);
     cb.user_buffer = device->state.vs_const_f;
 
     if (!cb.buffer_size)
@@ -409,7 +414,7 @@ update_ps_constants_userbuf(struct NineDevice9 *device)
     struct pipe_constant_buffer cb;
     cb.buffer = NULL;
     cb.buffer_offset = 0;
-    cb.buffer_size = device->state.ps->const_used_size;
+    cb.buffer_size = DETERMINE_CONSTBUFFER_SIZE(device, device->state.ps);
     cb.user_buffer = device->state.ps_const_f;
 
     if (!cb.buffer_size)

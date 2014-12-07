@@ -367,13 +367,15 @@ update_vs_constants_userbuf(struct NineDevice9 *device)
         const struct nine_range *r = lconstf->ranges;
         unsigned n = 0;
         float *src = (float *)cb.user_buffer;
-        temp_buffer = (float *)MALLOC(cb.buffer_size);
+        temp_buffer = (float *)MALLOC(device->vs_const_size);
         memcpy(temp_buffer, src, cb.buffer_size);
         while (r) {
             unsigned p = r->bgn;
             unsigned c = r->end - r->bgn;
             memcpy(&temp_buffer[p * 4], &lconstf->data[n * 4], c * 4 * sizeof(float));
             n += c;
+            if (cb.buffer_size < r->end * 4)
+                cb.buffer_size = r->end * 4;
             r = r->next;
         }
         cb.user_buffer = temp_buffer;

@@ -626,16 +626,14 @@ tx_src_scalar(struct ureg_dst dst)
  * but radeon drivers might care, if they don't infer it from TGSI.
  */
 static void
-tx_decl_constants(struct shader_translator *tx)
+tx_decl_constants(struct NineDevice9 *device, struct shader_translator *tx)
 {
-    unsigned i, n = 0;
+    unsigned i;
+    unsigned max_constants = device->max_vs_const_f + NINE_MAX_CONST_I
+                             + NINE_MAX_CONST_B / 4;
 
-    for (i = 0; i < NINE_MAX_CONST_F; ++i)
-        ureg_DECL_constant(tx->ureg, n++);
-    for (i = 0; i < NINE_MAX_CONST_I; ++i)
-        ureg_DECL_constant(tx->ureg, n++);
-    for (i = 0; i < (NINE_MAX_CONST_B / 4); ++i)
-        ureg_DECL_constant(tx->ureg, n++);
+    for (i = 0; i < max_constants; i++)
+        ureg_DECL_constant(tx->ureg, i);
 }
 
 static INLINE void
@@ -3108,7 +3106,7 @@ nine_translate_shader(struct NineDevice9 *device, struct nine_shader_info *info)
         hr = E_OUTOFMEMORY;
         goto out;
     }
-    tx_decl_constants(tx);
+    tx_decl_constants(device, tx);
 
     tx->native_integers = GET_SHADER_CAP(INTEGERS);
     tx->inline_subroutines = !GET_SHADER_CAP(SUBROUTINES);

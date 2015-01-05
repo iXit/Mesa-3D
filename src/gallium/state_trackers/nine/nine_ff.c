@@ -1436,8 +1436,8 @@ nine_ff_get_vs(struct NineDevice9 *device)
     }
 
     for (s = 0; s < 8; ++s) {
-        if (state->ff.tex_stage[s][D3DTSS_COLOROP] == D3DTOP_DISABLE &&
-            state->ff.tex_stage[s][D3DTSS_ALPHAOP] == D3DTOP_DISABLE)
+        if (state->ff.tex_stage[s][D3DTSS_COLOROP] != D3DTA_TEXTURE &&
+            state->ff.tex_stage[s][D3DTSS_ALPHAOP] != D3DTA_TEXTURE)
             break;
         key.tc_idx |= (state->ff.tex_stage[s][D3DTSS_TEXCOORDINDEX] & 7) << (s * 3);
         if (!key.position_t) {

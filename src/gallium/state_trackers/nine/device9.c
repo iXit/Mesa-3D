@@ -1067,6 +1067,19 @@ NineDevice9_UpdateSurface( struct NineDevice9 *This,
     user_assert(dst->desc.MultiSampleType == D3DMULTISAMPLE_NONE, D3DERR_INVALIDCALL);
     user_assert(src->desc.MultiSampleType == D3DMULTISAMPLE_NONE, D3DERR_INVALIDCALL);
 
+    /* skip tests for surface with same dimensions */
+    if ((src->desc.Width != dst->desc.Width) || (src->desc.Height != dst->desc.Height))
+    {
+        if (pSourceRect)
+        {
+            user_assert((pSourceRect->right - pSourceRect->left) > 2, D3DERR_INVALIDCALL);
+            user_assert((pSourceRect->bottom - pSourceRect->top) > 2, D3DERR_INVALIDCALL);
+        }
+
+        user_assert(src->desc.Width > 2, D3DERR_INVALIDCALL);
+        user_assert(src->desc.Height > 2, D3DERR_INVALIDCALL);
+    }
+
     return NineSurface9_CopySurface(dst, src, pDestPoint, pSourceRect);
 }
 

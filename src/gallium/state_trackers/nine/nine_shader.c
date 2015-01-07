@@ -526,7 +526,7 @@ static boolean
 tx_lconstf(struct shader_translator *tx, struct ureg_src *src, INT index)
 {
    INT i;
-   if (index < 0 || index >= (NINE_MAX_CONST_F * 2)) {
+   if (index < 0 || index >= NINE_MAX_CONST_F) {
        tx->failure = TRUE;
        return FALSE;
    }
@@ -566,8 +566,7 @@ tx_set_lconstf(struct shader_translator *tx, INT index, float f[4])
 {
     unsigned n;
 
-    /* Anno1404 sets out of range constants. */
-    FAILURE_VOID(index < 0 || index >= (NINE_MAX_CONST_F * 2))
+    FAILURE_VOID(index < 0 || index >= NINE_MAX_CONST_F)
     if (index >= NINE_MAX_CONST_F)
         WARN("lconstf index %i too high, indirect access won't work\n", index);
 

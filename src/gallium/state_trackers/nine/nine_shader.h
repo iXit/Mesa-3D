@@ -63,32 +63,30 @@ struct nine_shader_info
     unsigned const_b_base; /* in vec4 (16 byte) units */
     unsigned const_used_size;
 
+    unsigned num_float_consts_slots;
+    unsigned num_int_consts_slots;
+    unsigned num_bool_consts_slots;
+
     struct nine_lconstf lconstf; /* out, NOTE: members to be free'd by user */
 };
 
 static INLINE void
 nine_info_mark_const_f_used(struct nine_shader_info *info, int idx)
 {
-    unsigned size = (idx + 1) * 16;
-
-    if (info->const_used_size < size)
-        info->const_used_size = size;
+    if (info->num_float_consts_slots < (idx + 1))
+        info->num_float_consts_slots = idx + 1;
 }
 static INLINE void
 nine_info_mark_const_i_used(struct nine_shader_info *info, int idx)
 {
-    unsigned size = (info->const_i_base + (idx + 1)) * 16;
-
-    if (info->const_used_size < size)
-        info->const_used_size = size;
+    if (info->num_int_consts_slots < (idx + 1))
+        info->num_int_consts_slots = idx + 1;
 }
 static INLINE void
 nine_info_mark_const_b_used(struct nine_shader_info *info, int idx)
 {
-    unsigned size = (info->const_b_base + ((idx + 4) / 4)) * 16;
-
-    if (info->const_used_size < size)
-        info->const_used_size = size;
+    if (info->num_bool_consts_slots < (idx + 1))
+        info->num_bool_consts_slots = idx + 1;
 }
 
 HRESULT

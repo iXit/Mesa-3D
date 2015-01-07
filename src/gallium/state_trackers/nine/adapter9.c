@@ -305,6 +305,11 @@ NineAdapter9_CheckDeviceFormat( struct NineAdapter9 *This,
          RType == D3DRTYPE_TEXTURE))
         return D3D_OK;
 
+    /* RESZ hack */
+    if (CheckFormat == D3DFMT_RESZ && bind == PIPE_BIND_RENDER_TARGET &&
+        RType == D3DRTYPE_SURFACE)
+        return D3D_OK;
+
     if (Usage & D3DUSAGE_QUERY_POSTPIXELSHADER_BLENDING)
         bind |= PIPE_BIND_BLENDABLE;
 

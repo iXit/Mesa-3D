@@ -3202,6 +3202,12 @@ nine_translate_shader(struct NineDevice9 *device, struct nine_shader_info *info)
         hr = D3D_OK;
     }
 
+    /* r500 */
+    if (info->num_float_consts_slots > device->max_vs_const_f &&
+        (info->num_int_consts_slots || info->num_bool_consts_slots))
+        ERR("Overlapping constant slots. The shader is likely to be buggy\n");
+
+
     if (tx->indirect_const_access) /* vs only */
         info->num_float_consts_slots = device->max_vs_const_f;
 

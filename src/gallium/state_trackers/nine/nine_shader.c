@@ -620,24 +620,6 @@ tx_src_scalar(struct ureg_dst dst)
     return src;
 }
 
-/* Need to declare all constants if indirect addressing is used,
- * otherwise we could scan the shader to determine the maximum.
- * TODO: It doesn't really matter for nv50 so I won't do the scan,
- * but radeon drivers might care, if they don't infer it from TGSI.
- */
-static void
-tx_decl_constants(struct shader_translator *tx)
-{
-    unsigned i, n = 0;
-
-    for (i = 0; i < NINE_MAX_CONST_F; ++i)
-        ureg_DECL_constant(tx->ureg, n++);
-    for (i = 0; i < NINE_MAX_CONST_I; ++i)
-        ureg_DECL_constant(tx->ureg, n++);
-    for (i = 0; i < (NINE_MAX_CONST_B / 4); ++i)
-        ureg_DECL_constant(tx->ureg, n++);
-}
-
 static INLINE void
 tx_temp_alloc(struct shader_translator *tx, INT idx)
 {
@@ -3083,7 +3065,7 @@ nine_translate_shader(struct NineDevice9 *device, struct nine_shader_info *info)
     struct shader_translator *tx;
     HRESULT hr = D3D_OK;
     const unsigned processor = tgsi_processor_from_type(info->type);
-    unsigned slot_max;
+    unsigned s, slot_max;
 
     user_assert(processor != ~0, D3DERR_INVALIDCALL);
 
@@ -3111,7 +3093,6 @@ nine_translate_shader(struct NineDevice9 *device, struct nine_shader_info *info)
         hr = E_OUTOFMEMORY;
         goto out;
     }
-    tx_decl_constants(tx);
 
     tx->native_integers = GET_SHADER_CAP(INTEGERS);
     tx->inline_subroutines = !GET_SHADER_CAP(SUBROUTINES);
@@ -3225,6 +3206,9 @@ nine_translate_shader(struct NineDevice9 *device, struct nine_shader_info *info)
                    device->max_vs_const_f + info->num_int_consts_slots :
                info->num_float_consts_slots;
     info->const_used_size = sizeof(float[4]) * slot_max; /* slots start from 1 */
+
+    for(s = 0; s < slot_max; s++)
+        ureg_DECL_constant(tx->ureg, s);
 
     info->cso = ureg_create_shader_and_destroy(tx->ureg, device->pipe);
     if (!info->cso) {

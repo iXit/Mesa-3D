@@ -142,11 +142,12 @@ get_bus_info( int fd,
               DWORD *revision )
 {
     drm_unique_t u;
+    int vid, did;
 
     u.unique_len = 0;
     u.unique = NULL;
 
-    if (ioctl(fd, DRM_IOCTL_GET_UNIQUE, &u)) { return; }
+    if (ioctl(fd, DRM_IOCTL_GET_UNIQUE, &u)) { goto ioctl_failure; }
     u.unique = CALLOC(u.unique_len+1, 1);
 
     if (ioctl(fd, DRM_IOCTL_GET_UNIQUE, &u)) { return; }
@@ -188,6 +189,22 @@ get_bus_info( int fd,
     }
 
     FREE(u.unique);
+    return;
+ioctl_failure:
+    if (loader_get_pci_id_for_fd(fd, &vid, &did)) {
+        DBG("PCI info: vendor=0x%04x, device=0x%04x\n",
+            vid, did);
+        *vendorid = vid;
+        *deviceid = did;
+        *subsysid = 0;
+        *revision = 0;
+    } else {
+        DBG("Unable to detect card. Fake GTX 680.\n");
+        *vendorid = 0x10de; /* NV GTX 680 */
+        *deviceid = 0x1180;
+        *subsysid = 0;
+        *revision = 0;
+    }
 }
 
 static INLINE void

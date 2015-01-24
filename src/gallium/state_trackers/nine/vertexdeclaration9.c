@@ -190,7 +190,7 @@ NineVertexDeclaration9_ctor( struct NineVertexDeclaration9 *This,
     }
 
     caps = NineDevice9_GetCaps(This->base.device);
-    user_assert(0 < This->nelems && This->nelems <= caps->MaxStreams, D3DERR_INVALIDCALL);
+    user_assert(0 <= This->nelems && This->nelems <= caps->MaxStreams, D3DERR_INVALIDCALL);
 
     This->decls = CALLOC(This->nelems+1, sizeof(D3DVERTEXELEMENT9));
     This->elems = CALLOC(This->nelems, sizeof(struct pipe_vertex_element));

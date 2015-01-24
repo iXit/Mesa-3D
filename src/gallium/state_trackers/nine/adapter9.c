@@ -254,6 +254,7 @@ NineAdapter9_CheckDeviceFormat( struct NineAdapter9 *This,
     enum pipe_format pf;
     enum pipe_texture_target target;
     unsigned bind = 0;
+    boolean srgb;
 
     /* Check adapter format. */
 
@@ -328,10 +329,8 @@ NineAdapter9_CheckDeviceFormat( struct NineAdapter9 *This,
         break;
     }
 
-
-    pf = d3d9_to_pipe_format_checked(screen, CheckFormat, target, 0, bind,
-                                     Usage & (D3DUSAGE_QUERY_SRGBREAD |
-                                     D3DUSAGE_QUERY_SRGBWRITE));
+    srgb = (Usage & (D3DUSAGE_QUERY_SRGBREAD | D3DUSAGE_QUERY_SRGBWRITE)) != 0;
+    pf = d3d9_to_pipe_format_checked(screen, CheckFormat, target, 0, bind, srgb);
     if (pf == PIPE_FORMAT_NONE) {
         DBG("NOT AVAILABLE\n");
         return D3DERR_NOTAVAILABLE;

@@ -2595,6 +2595,9 @@ NineDevice9_DrawPrimitive( struct NineDevice9 *This,
 
     nine_update_state(This, ~0);
 
+    if (This->state.broken_vertex)
+        return D3D_OK; /* do not draw anything but return no error */
+
     init_draw_info(&info, This, PrimitiveType, PrimitiveCount);
     info.indexed = FALSE;
     info.start = StartVertex;
@@ -2628,6 +2631,9 @@ NineDevice9_DrawIndexedPrimitive( struct NineDevice9 *This,
 
     nine_update_state(This, ~0);
 
+    if (This->state.broken_vertex)
+        return D3D_OK; /* do not draw anything but return no error */
+
     init_draw_info(&info, This, PrimitiveType, PrimitiveCount);
     info.indexed = TRUE;
     info.start = StartIndex;
@@ -2659,6 +2665,9 @@ NineDevice9_DrawPrimitiveUP( struct NineDevice9 *This,
                 D3DERR_INVALIDCALL);
 
     nine_update_state(This, ~0);
+
+    if (This->state.broken_vertex)
+        return D3D_OK; /* do not draw anything but return no error */
 
     init_draw_info(&info, This, PrimitiveType, PrimitiveCount);
     info.indexed = FALSE;
@@ -2721,6 +2730,9 @@ NineDevice9_DrawIndexedPrimitiveUP( struct NineDevice9 *This,
                 IndexDataFormat == D3DFMT_INDEX32, D3DERR_INVALIDCALL);
 
     nine_update_state(This, ~0);
+
+    if (This->state.broken_vertex)
+        return D3D_OK; /* do not draw anything but return no error */
 
     init_draw_info(&info, This, PrimitiveType, PrimitiveCount);
     info.indexed = TRUE;
@@ -2805,6 +2817,9 @@ NineDevice9_ProcessVertices( struct NineDevice9 *This,
         STUB(D3DERR_INVALIDCALL);
 
     nine_update_state(This, ~0);
+
+    if (This->state.broken_vertex)
+        return D3D_OK; /* do not draw anything but return no error */
 
     /* TODO: Create shader with stream output. */
     STUB(D3DERR_INVALIDCALL);

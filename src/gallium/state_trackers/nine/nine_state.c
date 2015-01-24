@@ -194,11 +194,15 @@ update_vertex_elements(struct NineDevice9 *device)
     struct pipe_vertex_element ve[PIPE_MAX_ATTRIBS];
 
     state->stream_usage_mask = 0;
+    state->broken_vertex = FALSE;
 
     vs = device->state.vs ? device->state.vs : device->ff.vs;
 
-    if (!vdecl) /* no inputs */
+    if (!vdecl) { /* no inputs */
+        state->broken_vertex = TRUE;
         return;
+    }
+
     for (n = 0; n < vs->num_inputs; ++n) {
         DBG("looking up input %u (usage %u) from vdecl(%p)\n",
             n, vs->input_map[n].ndecl, vdecl);
@@ -222,16 +226,14 @@ update_vertex_elements(struct NineDevice9 *device)
             /* TODO: msdn doesn't specify what should happen when the vertex
              * declaration doesn't match the vertex shader inputs.
              * Some websites say the code will pass but nothing will get rendered.
-             * We should check and implement the correct behaviour. */
-            /* Put PIPE_FORMAT_NONE.
-             * Some drivers (r300) are very unhappy with that */
-            ve[n].src_format = PIPE_FORMAT_NONE;
-            ve[n].src_offset = 0;
-            ve[n].instance_divisor = 0;
-            ve[n].vertex_buffer_index = 0;
+             * We should check and implement the correct behaviour.
+             * For now do not render anything */
+            state->broken_vertex = TRUE;
         }
     }
-    cso_set_vertex_elements(device->cso, vs->num_inputs, ve);
+
+    if (!state->broken_vertex)
+        cso_set_vertex_elements(device->cso, vs->num_inputs, ve);
 
     state->changed.stream_freq = 0;
 }

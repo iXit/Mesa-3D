@@ -164,6 +164,7 @@ struct nine_state
     UINT stream_freq[PIPE_MAX_ATTRIBS];
     uint32_t stream_instancedata_mask; /* derived from stream_freq */
     uint32_t stream_usage_mask; /* derived from VS and vdecl */
+    boolean broken_vertex;
 
     struct pipe_clip_state clip;
     struct pipe_framebuffer_state fb;

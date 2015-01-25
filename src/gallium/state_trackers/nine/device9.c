@@ -53,6 +53,18 @@
 
 #define DBG_CHANNEL DBG_DEVICE
 
+static void nine_setup_fpu(void)
+{
+#if defined(__GNUC__) && (defined(__i386__) || defined(__x86_64__))
+    WORD cw;
+    __asm__ volatile ("fnstcw %0" : "=m" (cw));
+    cw = (cw & ~0xf3f) | 0x3f;
+    __asm__ volatile ("fldcw %0" : : "m" (cw));
+#else
+    WARN_ONCE("FPU setup not supported on non-x86 platforms\n");
+#endif
+}
+
 static void
 NineDevice9_SetDefaultState( struct NineDevice9 *This, boolean is_reset )
 {
@@ -167,6 +179,9 @@ NineDevice9_ctor( struct NineDevice9 *This,
     This->present = pPresentationGroup;
     IDirect3D9_AddRef(This->d3d9);
     ID3DPresentGroup_AddRef(This->present);
+
+    if ( !(This->params.BehaviorFlags & D3DCREATE_FPU_PRESERVE))
+        nine_setup_fpu();
 
     This->pipe = This->screen->context_create(This->screen, NULL);
     if (!This->pipe) { return E_OUTOFMEMORY; } /* guess */

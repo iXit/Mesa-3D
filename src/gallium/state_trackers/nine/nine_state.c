@@ -566,6 +566,7 @@ update_ps_constants_userbuf(struct NineDevice9 *device)
     struct nine_state *state = &device->state;
     struct pipe_context *pipe = device->pipe;
     struct pipe_constant_buffer cb;
+    int i;
     cb.buffer = NULL;
     cb.buffer_offset = 0;
     cb.buffer_size = device->state.ps->const_used_size;
@@ -584,6 +585,32 @@ update_ps_constants_userbuf(struct NineDevice9 *device)
         uint32_t *bdst = (uint32_t *)&idst[4 * NINE_MAX_CONST_I];
         memcpy(bdst, state->ps_const_b, sizeof(state->ps_const_b));
         state->changed.ps_const_b = 0;
+    }
+
+    /* Upload special constants needed to implement PS1.x instructions like TEXBEM,TEXBEML and BEM */
+    if (device->state.ps->byte_code.version >> 4 == 1 && device->state.ps->bumpenvmat_needed) { /* Version.major = 1 */
+
+        memcpy(device->state.ps_bumpenvmap_temp, cb.user_buffer, cb.buffer_size);
+
+        /* Set the bump env matrix */
+        for (i = 0; i < 8; i++) {
+            /* 4floats*maxps1xconst+4floats*texstage+matpart */
+            /* The matrix as comments on wine visual.c test say, is transposed */
+            device->state.ps_bumpenvmap_temp[4 * 8 + 4 * i + 0] = *((float *)&device->state.ff.tex_stage[i][D3DTSS_BUMPENVMAT00]);
+            device->state.ps_bumpenvmap_temp[4 * 8 + 4 * i + 1] = *((float *)&device->state.ff.tex_stage[i][D3DTSS_BUMPENVMAT10]);
+            device->state.ps_bumpenvmap_temp[4 * 8 + 4 * i + 2] = *((float *)&device->state.ff.tex_stage[i][D3DTSS_BUMPENVMAT01]);
+            device->state.ps_bumpenvmap_temp[4 * 8 + 4 * i + 3] = *((float *)&device->state.ff.tex_stage[i][D3DTSS_BUMPENVMAT11]);
+        }
+
+        /* Set the bumpenvl parameters */
+        for (i = 0; i < 4; i++) {
+            device->state.ps_bumpenvmap_temp[4 * 8 + 4 * 8 + i * 4 + 0] = *((float *)&device->state.ff.tex_stage[i * 2 + 0][D3DTSS_BUMPENVLSCALE]);
+            device->state.ps_bumpenvmap_temp[4 * 8 + 4 * 8 + i * 4 + 1] = *((float *)&device->state.ff.tex_stage[i * 2 + 0][D3DTSS_BUMPENVLOFFSET]);
+            device->state.ps_bumpenvmap_temp[4 * 8 + 4 * 8 + i * 4 + 2] = *((float *)&device->state.ff.tex_stage[i * 2 + 1][D3DTSS_BUMPENVLSCALE]);
+            device->state.ps_bumpenvmap_temp[4 * 8 + 4 * 8 + i * 4 + 3] = *((float *)&device->state.ff.tex_stage[i * 2 + 1][D3DTSS_BUMPENVLOFFSET]);
+        }
+
+        cb.user_buffer = device->state.ps_bumpenvmap_temp;
     }
 
     pipe->set_constant_buffer(pipe, PIPE_SHADER_FRAGMENT, 0, &cb);

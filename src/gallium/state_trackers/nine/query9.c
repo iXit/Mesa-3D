@@ -254,7 +254,19 @@ NineQuery9_GetData( struct NineQuery9 *This,
         nresult.b = presult.timestamp_disjoint.disjoint;
         break;
     case D3DQUERYTYPE_TIMESTAMPFREQ:
-        nresult.u64 = presult.timestamp_disjoint.frequency;
+        /* Applications use it to convert the TIMESTAMP value to time.
+           AMD drivers on windows seem to return the actual hardware clock
+           resolution and corresponding values in TIMESTAMP.
+           However, this behaviour is not easy to replicate here.
+           So instead we do what wine and opengl do, and use
+           nanoseconds TIMESTAMPs.
+           (Which is also the unit used by PIPE_QUERY_TIMESTAMP.)
+
+           Note that, to this day, presult.timestamp_disjoint.frequency
+           only gives the actual hardware clock for radeon drivers,
+           and always 1000000000 for other drivers.
+        */
+        nresult.u64 = 1000000000;
         break;
     case D3DQUERYTYPE_VERTEXSTATS:
         nresult.vertexstats.NumRenderedTriangles =

@@ -3197,6 +3197,7 @@ nine_translate_shader(struct NineDevice9 *device, struct nine_shader_info *info)
     HRESULT hr = D3D_OK;
     const unsigned processor = tgsi_processor_from_type(info->type);
     unsigned s, slot_max;
+    unsigned max_const_f;
 
     user_assert(processor != ~0, D3DERR_INVALIDCALL);
 
@@ -3336,11 +3337,12 @@ nine_translate_shader(struct NineDevice9 *device, struct nine_shader_info *info)
     if (tx->indirect_const_access) /* vs only */
         info->const_float_slots = device->max_vs_const_f;
 
+    max_const_f = IS_VS ? device->max_vs_const_f : device->max_ps_const_f;
     slot_max = info->const_bool_slots > 0 ?
-                   device->max_vs_const_f + NINE_MAX_CONST_I
-                   + info->const_bool_slots :
+                   max_const_f + NINE_MAX_CONST_I
+                   + (info->const_bool_slots+3)/4 :
                        info->const_int_slots > 0 ?
-                           device->max_vs_const_f + info->const_int_slots :
+                           max_const_f + info->const_int_slots :
                                info->const_float_slots;
     assert(IS_VS || tx->version.major > 1 || slot_max <= 8);
 

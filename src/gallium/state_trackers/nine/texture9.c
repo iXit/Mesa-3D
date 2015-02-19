@@ -51,7 +51,7 @@ NineTexture9_ctor( struct NineTexture9 *This,
     unsigned l;
     D3DSURFACE_DESC sfdesc;
     HRESULT hr;
-    void *user_buffer = NULL;
+    void *user_buffer = NULL, *user_buffer_level;
 
     DBG("(%p) Width=%u Height=%u Levels=%u Usage=%s Format=%s Pool=%s "
         "pSharedHandle=%p\n", This, Width, Height, Levels,
@@ -133,6 +133,12 @@ NineTexture9_ctor( struct NineTexture9 *This,
 
     if (pSharedHandle && *pSharedHandle) { /* Pool == D3DPOOL_SYSTEMMEM */
         user_buffer = (void *)*pSharedHandle;
+    } else if (Pool != D3DPOOL_DEFAULT) {
+        user_buffer = MALLOC(nine_format_get_alloc_size(pf, Width, Height,
+                                                        info->last_level));
+        This->managed_buffer = user_buffer;
+        if (!This->managed_buffer)
+            return E_OUTOFMEMORY;
     }
 
     This->surfaces = CALLOC(info->last_level + 1, sizeof(*This->surfaces));
@@ -163,9 +169,12 @@ NineTexture9_ctor( struct NineTexture9 *This,
     for (l = 0; l <= info->last_level; ++l) {
         sfdesc.Width = u_minify(Width, l);
         sfdesc.Height = u_minify(Height, l);
+        user_buffer_level = user_buffer ? user_buffer +
+            nine_format_get_p_offset(pf, Width, Height, l) :
+            NULL;
 
         hr = NineSurface9_new(This->base.base.base.device, NineUnknown(This),
-                              resource, user_buffer,
+                              resource, user_buffer_level,
                               D3DRTYPE_TEXTURE, l, 0,
                               &sfdesc, &This->surfaces[l]);
         if (FAILED(hr))
@@ -192,6 +201,9 @@ NineTexture9_dtor( struct NineTexture9 *This )
             NineUnknown_Destroy(&This->surfaces[l]->base.base);
         FREE(This->surfaces);
     }
+
+    if (This->managed_buffer)
+        FREE(This->managed_buffer);
 
     NineBaseTexture9_dtor(&This->base);
 }

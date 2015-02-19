@@ -40,8 +40,9 @@ NineCubeTexture9_ctor( struct NineCubeTexture9 *This,
     struct pipe_resource *info = &This->base.base.info;
     struct pipe_screen *screen = pParams->device->screen;
     enum pipe_format pf;
-    unsigned i;
+    unsigned i, l, f, offset, face_size = 0;
     D3DSURFACE_DESC sfdesc;
+    void *p;
     HRESULT hr;
 
     DBG("This=%p pParams=%p EdgeLength=%u Levels=%u Usage=%d "
@@ -94,6 +95,14 @@ NineCubeTexture9_ctor( struct NineCubeTexture9 *This,
             PIPE_BIND_TRANSFER_WRITE;
     }
 
+    if (Pool != D3DPOOL_DEFAULT) {
+        face_size = nine_format_get_alloc_size(pf, EdgeLength, EdgeLength,
+                                               info->last_level);
+        This->managed_buffer = MALLOC(6 * face_size);
+        if (!This->managed_buffer)
+            return E_OUTOFMEMORY;
+    }
+
     This->surfaces = CALLOC(6 * (info->last_level + 1), sizeof(*This->surfaces));
     if (!This->surfaces)
         return E_OUTOFMEMORY;
@@ -114,16 +123,22 @@ NineCubeTexture9_ctor( struct NineCubeTexture9 *This,
     sfdesc.Pool = Pool;
     sfdesc.MultiSampleType = D3DMULTISAMPLE_NONE;
     sfdesc.MultiSampleQuality = 0;
-    for (i = 0; i < (info->last_level + 1) * 6; ++i) {
-        sfdesc.Width = sfdesc.Height = u_minify(EdgeLength, i / 6);
+    for (f = 0; f < 6; f++) {
+        offset = f * face_size;
+        for (l = 0; l < info->last_level + 1; l++) {
+            sfdesc.Width = sfdesc.Height = u_minify(EdgeLength, l);
+            p = This->managed_buffer ? This->managed_buffer + offset +
+                nine_format_get_p_offset(pf, EdgeLength, EdgeLength, l) :
+                NULL;
 
-        hr = NineSurface9_new(This->base.base.base.device, NineUnknown(This),
-                              This->base.base.resource, NULL, D3DRTYPE_CUBETEXTURE,
-                              i / 6, i % 6,
-                              &sfdesc, &This->surfaces[i]);
-        if (FAILED(hr))
-            return hr;
+            hr = NineSurface9_new(This->base.base.base.device, NineUnknown(This),
+                                  This->base.base.resource, p, D3DRTYPE_CUBETEXTURE,
+                                  l, f, &sfdesc, &This->surfaces[f + 6 * l]);
+            if (FAILED(hr))
+                return hr;
+        }
     }
+
     for (i = 0; i < 6; ++i) /* width = 0 means empty, depth stays 1 */
         This->dirty_rect[i].depth = 1;
 
@@ -142,6 +157,9 @@ NineCubeTexture9_dtor( struct NineCubeTexture9 *This )
             NineUnknown_Destroy(&This->surfaces[i]->base.base);
         FREE(This->surfaces);
     }
+
+    if (This->managed_buffer)
+        FREE(This->managed_buffer);
 
     NineBaseTexture9_dtor(&This->base);
 }

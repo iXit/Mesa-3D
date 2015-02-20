@@ -134,6 +134,11 @@ NineTexture9_ctor( struct NineTexture9 *This,
     if (pSharedHandle && *pSharedHandle) { /* Pool == D3DPOOL_SYSTEMMEM */
         user_buffer = (void *)*pSharedHandle;
     } else if (Pool != D3DPOOL_DEFAULT) {
+        /* TODO: For D3DUSAGE_AUTOGENMIPMAP, it is likely we only have to
+         * allocate only for the first level, since it is the only lockable
+         * level. Check apps don't crash if we allocate smaller buffer (some
+         * apps access sublevels of texture even if they locked only first
+         * level) */
         user_buffer = MALLOC(nine_format_get_alloc_size(pf, Width, Height,
                                                         info->last_level));
         This->managed_buffer = user_buffer;

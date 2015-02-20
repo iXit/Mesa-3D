@@ -231,7 +231,7 @@ NineSurface9_GetContainer( struct NineSurface9 *This,
     return hr;
 }
 
-static INLINE void
+void
 NineSurface9_MarkContainerDirty( struct NineSurface9 *This )
 {
     if (This->texture) {

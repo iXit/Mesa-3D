@@ -94,6 +94,9 @@ NineCubeTexture9_ctor( struct NineCubeTexture9 *This,
             PIPE_BIND_TRANSFER_READ |
             PIPE_BIND_TRANSFER_WRITE;
     }
+    if (Usage & D3DUSAGE_SOFTWAREPROCESSING)
+        DBG("Application asked for Software Vertex Processing, "
+            "but this is unimplemented\n");
 
     if (Pool != D3DPOOL_DEFAULT) {
         face_size = nine_format_get_alloc_size(pf, EdgeLength, EdgeLength,

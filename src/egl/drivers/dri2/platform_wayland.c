@@ -800,12 +800,33 @@ bad_format:
    return NULL;
 }
 
+static char
+is_fd_render_node(int fd)
+{
+   struct stat render;
+
+   if (fstat(fd, &render))
+      return 0;
+
+   if (!S_ISCHR(render.st_mode))
+      return 0;
+
+   if (render.st_rdev & 0x80)
+      return 1;
+   return 0;
+}
+
 static int
 dri2_wl_authenticate(_EGLDisplay *disp, uint32_t id)
 {
    struct dri2_egl_display *dri2_dpy = dri2_egl_display(disp);
    int ret = 0;
 
+   if (dri2_dpy->is_render_node) {
+      _eglLog(_EGL_WARNING, "wayland-egl: client asks server to "
+                            "authenticate for render-nodes");
+      return 0;
+   }
    dri2_dpy->authenticated = 0;
 
    wl_drm_authenticate(dri2_dpy->wl_drm, id);
@@ -847,8 +868,13 @@ drm_handle_device(void *data, struct wl_drm *drm, const char *device)
       return;
    }
 
-   drmGetMagic(dri2_dpy->fd, &magic);
-   wl_drm_authenticate(dri2_dpy->wl_drm, magic);
+   if (is_fd_render_node(dri2_dpy->fd)) {
+      dri2_dpy->is_render_node = 1;
+      dri2_dpy->authenticated = 1;
+   } else {
+      drmGetMagic(dri2_dpy->fd, &magic);
+      wl_drm_authenticate(dri2_dpy->wl_drm, magic);
+   }
 }
 
 static void
@@ -990,6 +1016,27 @@ static struct dri2_egl_display_vtbl dri2_wl_display_vtbl = {
    .get_sync_values = dri2_fallback_get_sync_values,
 };
 
+static EGLBoolean
+is_render_node_capable(struct dri2_egl_display *dri2_dpy)
+{
+   const __DRIextension **extensions;
+   int i;
+
+   /* We cannot use Gem names with render-nodes, only prime fds (dma-buf).
+    * The server needs to accept them */
+   if (!(dri2_dpy->capabilities & WL_DRM_CAPABILITY_PRIME))
+      return EGL_FALSE;
+
+   /* Check the __DRIimage api is supported (this is required by our
+    * codepath without Gem names) */
+   extensions = dri2_dpy->driver_extensions;
+   for (i = 0; extensions[i]; i++) {
+      if (strcmp(extensions[i]->name, __DRI_IMAGE_DRIVER) == 0)
+         return EGL_TRUE;
+   }
+   return EGL_FALSE;
+}
+
 EGLBoolean
 dri2_initialize_wayland(_EGLDriver *drv, _EGLDisplay *disp)
 {
@@ -1075,6 +1122,11 @@ dri2_initialize_wayland(_EGLDriver *drv, _EGLDisplay *disp)
        dri2_dpy->image->createImageFromFds == NULL)
       dri2_dpy->capabilities &= ~WL_DRM_CAPABILITY_PRIME;
 
+   if (dri2_dpy->is_render_node && !is_render_node_capable(dri2_dpy)) {
+      _eglLog(_EGL_WARNING, "wayland-egl: display is not render-node capable");
+      goto cleanup_screen;
+   }
+
    types = EGL_WINDOW_BIT;
    for (i = 0; dri2_dpy->driver_configs[i]; i++) {
       config = dri2_dpy->driver_configs[i];
@@ -1103,6 +1155,8 @@ dri2_initialize_wayland(_EGLDriver *drv, _EGLDisplay *disp)
 
    return EGL_TRUE;
 
+ cleanup_screen:
+   dri2_dpy->core->destroyScreen(dri2_dpy->dri_screen);
  cleanup_driver:
    dlclose(dri2_dpy->driver);
  cleanup_driver_name:

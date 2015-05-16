@@ -1262,6 +1262,8 @@ nine_state_set_defaults(struct NineDevice9 *device, const D3DCAPS9 *caps,
     for (s = 0; s < Elements(state->samp); ++s) {
         memcpy(&state->samp[s], nine_samp_state_defaults,
                sizeof(state->samp[s]));
+        memcpy(&state->samp_advertised[s], nine_samp_state_defaults,
+               sizeof(state->samp_advertised[s]));
     }
 
     if (state->vs_const_f)

@@ -2344,8 +2344,15 @@ NineDevice9_SetRenderState( struct NineDevice9 *This,
     DBG("This=%p State=%u(%s) Value=%08x\n", This,
         State, nine_d3drs_to_string(State), Value);
 
+    user_assert(State < D3DRS_COUNT, D3DERR_INVALIDCALL);
+
+    if (state->rs_advertised[State] == Value && likely(!This->is_recording))
+        return D3D_OK;
+
+    state->rs_advertised[State] = Value;
+
     /* Amd hacks (equivalent to GL extensions) */
-    if (State == D3DRS_POINTSIZE) {
+    if (unlikely(State == D3DRS_POINTSIZE)) {
         if (Value == RESZ_CODE)
             return NineDevice9_ResolveZ(This);
 
@@ -2358,24 +2365,20 @@ NineDevice9_SetRenderState( struct NineDevice9 *This,
     }
 
     /* NV hack */
-    if (State == D3DRS_ADAPTIVETESS_Y &&
-        (Value == D3DFMT_ATOC || (Value == D3DFMT_UNKNOWN && state->rs[NINED3DRS_ALPHACOVERAGE]))) {
+    if (unlikely(State == D3DRS_ADAPTIVETESS_Y)) {
+        if (Value == D3DFMT_ATOC || (Value == D3DFMT_UNKNOWN && state->rs[NINED3DRS_ALPHACOVERAGE])) {
             state->rs[NINED3DRS_ALPHACOVERAGE] = (Value == D3DFMT_ATOC);
             state->changed.group |= NINE_STATE_BLEND;
             return D3D_OK;
+        }
     }
 
-    user_assert(State < D3DRS_COUNT, D3DERR_INVALIDCALL);
-
-    if (likely(state->rs_advertised[State] != Value) || unlikely(This->is_recording)) {
-        if (nine_check_render_state_value(State, Value))
-            state->rs[State] = Value;
-        else
-            state->rs[State] = nine_render_state_defaults[State];
-        state->rs_advertised[State] = Value;
-        state->changed.rs[State / 32] |= 1 << (State % 32);
-        state->changed.group |= nine_render_state_group[State];
-    }
+    if (likely(nine_check_render_state_value(State, Value)))
+        state->rs[State] = Value;
+    else
+        state->rs[State] = nine_render_state_defaults[State];
+    state->changed.rs[State / 32] |= 1 << (State % 32);
+    state->changed.group |= nine_render_state_group[State];
 
     return D3D_OK;
 }

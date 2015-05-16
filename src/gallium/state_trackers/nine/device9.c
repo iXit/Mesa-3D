@@ -38,6 +38,7 @@
 #include "nine_pipe.h"
 #include "nine_ff.h"
 #include "nine_dump.h"
+#include "nine_limits.h"
 
 #include "pipe/p_screen.h"
 #include "pipe/p_context.h"
@@ -112,8 +113,10 @@ NineDevice9_SetDefaultState( struct NineDevice9 *This, boolean is_reset )
         This->state.scissor.maxy = refSurf->desc.Height;
     }
 
-    if (This->nswapchains && This->swapchains[0]->params.EnableAutoDepthStencil)
+    if (This->nswapchains && This->swapchains[0]->params.EnableAutoDepthStencil) {
         This->state.rs[D3DRS_ZENABLE] = TRUE;
+        This->state.rs_advertised[D3DRS_ZENABLE] = TRUE;
+    }
     if (This->state.rs[D3DRS_ZENABLE])
         NineDevice9_SetDepthStencilSurface(
             This, (IDirect3DSurface9 *)This->swapchains[0]->zsbuf);
@@ -2362,10 +2365,14 @@ NineDevice9_SetRenderState( struct NineDevice9 *This,
             return D3D_OK;
     }
 
-    user_assert(State < Elements(state->rs), D3DERR_INVALIDCALL);
+    user_assert(State < D3DRS_COUNT, D3DERR_INVALIDCALL);
 
-    if (likely(state->rs[State] != Value) || unlikely(This->is_recording)) {
-        state->rs[State] = Value;
+    if (likely(state->rs_advertised[State] != Value) || unlikely(This->is_recording)) {
+        if (nine_check_render_state_value(State, Value))
+            state->rs[State] = Value;
+        else
+            state->rs[State] = nine_render_state_defaults[State];
+        state->rs_advertised[State] = Value;
         state->changed.rs[State / 32] |= 1 << (State % 32);
         state->changed.group |= nine_render_state_group[State];
     }
@@ -2378,9 +2385,9 @@ NineDevice9_GetRenderState( struct NineDevice9 *This,
                             D3DRENDERSTATETYPE State,
                             DWORD *pValue )
 {
-    user_assert(State < Elements(This->state.rs), D3DERR_INVALIDCALL);
+    user_assert(State < D3DRS_COUNT, D3DERR_INVALIDCALL);
 
-    *pValue = This->state.rs[State];
+    *pValue = This->state.rs_advertised[State];
     return D3D_OK;
 }
 

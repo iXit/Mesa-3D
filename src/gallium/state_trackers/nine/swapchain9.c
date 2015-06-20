@@ -990,3 +990,13 @@ NineSwapChain9_new( struct NineDevice9 *pDevice,
                           implicit, pPresent, pPresentationParameters,
                           pCTX, hFocusWindow, NULL);
 }
+
+BOOL
+NineSwapChain9_GetOccluded( struct NineSwapChain9 *This )
+{
+    if (This->base.device->minor_version_num > 0) {
+        return ID3DPresent_GetWindowOccluded(This->present);
+    }
+
+    return FALSE;
+}

@@ -100,6 +100,12 @@ NineDevice9Ex_PresentEx( struct NineDevice9Ex *This,
         This, pSourceRect, pDestRect, hDestWindowOverride,
         pDirtyRegion, dwFlags);
 
+
+    if (NineSwapChain9_GetOccluded(This->base.swapchains[0])) {
+        return S_PRESENT_OCCLUDED;
+    }
+
+
     for (i = 0; i < This->base.nswapchains; i++) {
         hr = NineSwapChain9_Present(This->base.swapchains[i], pSourceRect, pDestRect,
                                     hDestWindowOverride, pDirtyRegion, dwFlags);
@@ -107,6 +113,23 @@ NineDevice9Ex_PresentEx( struct NineDevice9Ex *This,
     }
 
     return D3D_OK;
+}
+
+HRESULT WINAPI
+NineDevice9Ex_Present( struct NineDevice9Ex *This,
+                     const RECT *pSourceRect,
+                     const RECT *pDestRect,
+                     HWND hDestWindowOverride,
+                     const RGNDATA *pDirtyRegion )
+{
+    DBG("This=%p pSourceRect=%p pDestRect=%p hDestWindowOverride=%p pDirtyRegion=%p\n",
+        This, pSourceRect, pDestRect, hDestWindowOverride, pDirtyRegion);
+    if (NineSwapChain9_GetOccluded(This->base.swapchains[0])) {
+        return S_PRESENT_OCCLUDED;
+    }
+
+    return NineDevice9_Present(&This->base, pSourceRect, pDestRect,
+                               hDestWindowOverride, pDirtyRegion);
 }
 
 HRESULT WINAPI
@@ -159,6 +182,14 @@ NineDevice9Ex_CheckDeviceState( struct NineDevice9Ex *This,
     DBG("This=%p hDestinationWindow=%p\n",
         This, hDestinationWindow);
 
+    user_assert(!This->base.swapchains[0]->params.Windowed, D3D_OK);
+
+    if (This->base.params.hFocusWindow == hDestinationWindow) {
+        if (NineSwapChain9_GetOccluded(This->base.swapchains[0]))
+            return S_PRESENT_OCCLUDED;
+    } else if(!NineSwapChain9_GetOccluded(This->base.swapchains[0])) {
+        return S_PRESENT_OCCLUDED;
+    }
     /* TODO: handle the other return values */
     return D3D_OK;
 }
@@ -222,14 +253,20 @@ NineDevice9Ex_ResetEx( struct NineDevice9Ex *This,
         if (pFullscreenDisplayMode) mode = &(pFullscreenDisplayMode[i]);
         hr = NineSwapChain9_Resize(This->base.swapchains[i], params, mode);
         if (FAILED(hr))
-            return (hr == D3DERR_OUTOFVIDEOMEMORY) ? hr : D3DERR_DEVICELOST;
+            break;
     }
 
     NineDevice9_SetRenderTarget(
         (struct NineDevice9 *)This, 0, (IDirect3DSurface9 *)This->base.swapchains[0]->buffers[0]);
 
-
     return hr;
+}
+
+HRESULT WINAPI
+NineDevice9Ex_Reset( struct NineDevice9Ex *This,
+                     D3DPRESENT_PARAMETERS *pPresentationParameters )
+{
+    return NineDevice9Ex_ResetEx(This, pPresentationParameters, NULL);
 }
 
 HRESULT WINAPI
@@ -249,11 +286,18 @@ NineDevice9Ex_GetDisplayModeEx( struct NineDevice9Ex *This,
     return NineSwapChain9Ex_GetDisplayModeEx(swapchain, pMode, pRotation);
 }
 
+HRESULT WINAPI
+NineDevice9Ex_TestCooperativeLevel( struct NineDevice9Ex *This )
+{
+    return D3D_OK;
+}
+
+
 IDirect3DDevice9ExVtbl NineDevice9Ex_vtable = {
     (void *)NineUnknown_QueryInterface,
     (void *)NineUnknown_AddRef,
     (void *)NineUnknown_Release,
-    (void *)NineDevice9_TestCooperativeLevel,
+    (void *)NineDevice9Ex_TestCooperativeLevel,
     (void *)NineDevice9_GetAvailableTextureMem,
     (void *)NineDevice9_EvictManagedResources,
     (void *)NineDevice9_GetDirect3D,
@@ -266,8 +310,8 @@ IDirect3DDevice9ExVtbl NineDevice9Ex_vtable = {
     (void *)NineDevice9_CreateAdditionalSwapChain,
     (void *)NineDevice9_GetSwapChain,
     (void *)NineDevice9_GetNumberOfSwapChains,
-    (void *)NineDevice9_Reset,
-    (void *)NineDevice9_Present,
+    (void *)NineDevice9Ex_Reset,
+    (void *)NineDevice9Ex_Present,
     (void *)NineDevice9_GetBackBuffer,
     (void *)NineDevice9_GetRasterStatus,
     (void *)NineDevice9_SetDialogBoxMode,

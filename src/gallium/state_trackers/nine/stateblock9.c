@@ -269,10 +269,15 @@ nine_state_copy_common(struct nine_state *dst,
     }
     if (mask->changed.group & NINE_STATE_FF_LIGHTING) {
         if (dst->ff.num_lights < mask->ff.num_lights) {
+            i = dst->ff.num_lights;
             dst->ff.light = REALLOC(dst->ff.light,
                                     dst->ff.num_lights * sizeof(D3DLIGHT9),
                                     mask->ff.num_lights * sizeof(D3DLIGHT9));
             dst->ff.num_lights = mask->ff.num_lights;
+            for (; i < dst->ff.num_lights; ++i) {
+                memset(&dst->ff.light[i], 0, sizeof(D3DLIGHT9));
+                dst->ff.light[i].Type = (D3DLIGHTTYPE)NINED3DLIGHT_INVALID;
+            }
         }
         for (i = 0; i < mask->ff.num_lights; ++i)
             if (mask->ff.light[i].Type != NINED3DLIGHT_INVALID)

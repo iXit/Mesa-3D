@@ -101,8 +101,11 @@ NineSurface9_ctor( struct NineSurface9 *This,
     if (pDesc->Usage & D3DUSAGE_DEPTHSTENCIL)
         This->base.info.bind |= PIPE_BIND_DEPTH_STENCIL;
 
-    /* Ram buffer with no parent. Has to allocate the resource itself */
-    if (!pResource && !pContainer) {
+    /* Ram buffer with no parent. Has to allocate the resource itself.
+     * Special case is ATI1/ATI2 for which we do a hack for DEFAULT pool */
+    if (!pResource && !pContainer ||
+        (is_ATI1_ATI2(This->base.info.format) &&
+         pDesc->Pool == D3DPOOL_DEFAULT)) {
         assert(!user_buffer);
         This->data = align_malloc(
             nine_format_get_level_alloc_size(This->base.info.format,
@@ -155,7 +158,9 @@ NineSurface9_dtor( struct NineSurface9 *This )
     pipe_surface_reference(&This->surface[1], NULL);
 
     /* Release system memory when we have to manage it (no parent) */
-    if (!This->base.base.container && This->data)
+    if (!This->base.base.container && This->data ||
+        (is_ATI1_ATI2(This->base.info.format) &&
+         This->desc.Pool == D3DPOOL_DEFAULT))
         FREE(This->data);
     NineResource9_dtor(&This->base);
 }
@@ -425,6 +430,21 @@ NineSurface9_UnlockRect( struct NineSurface9 *This )
     if (This->transfer) {
         This->pipe->transfer_unmap(This->pipe, This->transfer);
         This->transfer = NULL;
+    /* for ATI1/ATI2 and DEFAULT Pool we return a system
+     * memory buffer and upload from it to gpu memory.
+     * The reason is that apps expect a special stride
+     * for ATI1/ATI2, and we have more control on the
+     * real stride with mem buffer than with a map. */
+    } else if (is_ATI1_ATI2(This->base.info.format) &&
+               This->desc.Pool == D3DPOOL_DEFAULT) {
+        struct pipe_box dst_box;
+
+        u_box_2d_zslice(0, 0, This->layer, This->desc.Width,
+                        This->desc.Height, &dst_box);
+
+        This->pipe->transfer_inline_write(This->pipe, This->base.resource,
+                                          This->level, 0, &dst_box,
+                                          This->data, This->stride, 0);
     }
     --This->lock_count;
     return D3D_OK;

@@ -136,6 +136,7 @@ struct NineDevice9
     /* dummy vbo (containing 0 0 0 0) to bind if vertex shader input
      * is not bound to anything by the vertex declaration */
     struct pipe_resource *dummy_vbo;
+    int minor_version_num;
 };
 static inline struct NineDevice9 *
 NineDevice9( void *data )
@@ -153,7 +154,8 @@ NineDevice9_new( struct pipe_screen *pScreen,
                  struct d3dadapter9_context *pCTX,
                  boolean ex,
                  D3DDISPLAYMODEEX *pFullscreenDisplayMode,
-                 struct NineDevice9 **ppOut );
+                 struct NineDevice9 **ppOut,
+                 int minorVersionNum );
 
 HRESULT
 NineDevice9_ctor( struct NineDevice9 *This,
@@ -166,7 +168,8 @@ NineDevice9_ctor( struct NineDevice9 *This,
                   ID3DPresentGroup *pPresentationGroup,
                   struct d3dadapter9_context *pCTX,
                   boolean ex,
-                  D3DDISPLAYMODEEX *pFullscreenDisplayMode );
+                  D3DDISPLAYMODEEX *pFullscreenDisplayMode,
+                  int minorVersionNum );
 
 void
 NineDevice9_dtor( struct NineDevice9 *This );

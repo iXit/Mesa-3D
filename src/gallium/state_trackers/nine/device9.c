@@ -134,7 +134,8 @@ NineDevice9_ctor( struct NineDevice9 *This,
                   ID3DPresentGroup *pPresentationGroup,
                   struct d3dadapter9_context *pCTX,
                   boolean ex,
-                  D3DDISPLAYMODEEX *pFullscreenDisplayMode )
+                  D3DDISPLAYMODEEX *pFullscreenDisplayMode,
+                  int minorVersionNum )
 {
     unsigned i;
     HRESULT hr = NineUnknown_ctor(&This->base, pParams);
@@ -155,6 +156,8 @@ NineDevice9_ctor( struct NineDevice9 *This,
     This->params = *pCreationParameters;
     This->ex = ex;
     This->present = pPresentationGroup;
+    This->minor_version_num = minorVersionNum;
+
     IDirect3D9_AddRef(This->d3d9);
     ID3DPresentGroup_AddRef(This->present);
 
@@ -4022,7 +4025,8 @@ NineDevice9_new( struct pipe_screen *pScreen,
                  struct d3dadapter9_context *pCTX,
                  boolean ex,
                  D3DDISPLAYMODEEX *pFullscreenDisplayMode,
-                 struct NineDevice9 **ppOut )
+                 struct NineDevice9 **ppOut,
+                 int minorVersionNum )
 {
     BOOL lock;
     lock = !!(pCreationParameters->BehaviorFlags & D3DCREATE_MULTITHREADED);
@@ -4030,5 +4034,5 @@ NineDevice9_new( struct pipe_screen *pScreen,
     NINE_NEW(Device9, ppOut, lock, /* args */
              pScreen, pCreationParameters, pCaps,
              pPresentationParameters, pD3D9, pPresentationGroup, pCTX,
-             ex, pFullscreenDisplayMode);
+             ex, pFullscreenDisplayMode, minorVersionNum );
 }

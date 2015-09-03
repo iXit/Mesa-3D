@@ -35,10 +35,13 @@ struct NineVertexBuffer9
 
     /* G3D */
     struct pipe_context *pipe;
-    struct pipe_transfer **maps;
+
+    DWORD *flags;
     int nmaps, maxmaps;
 
     D3DVERTEXBUFFER_DESC desc;
+    void *data;
+    struct pipe_box box;
 };
 static inline struct NineVertexBuffer9 *
 NineVertexBuffer9( void *data )

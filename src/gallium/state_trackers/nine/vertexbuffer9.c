@@ -47,8 +47,8 @@ NineVertexBuffer9_ctor( struct NineVertexBuffer9 *This,
 
     user_assert(pDesc->Pool != D3DPOOL_SCRATCH, D3DERR_INVALIDCALL);
 
-    This->maps = MALLOC(sizeof(struct pipe_transfer *));
-    if (!This->maps)
+    This->flags = MALLOC(sizeof(DWORD));
+    if (!This->flags)
         return E_OUTOFMEMORY;
     This->nmaps = 0;
     This->maxmaps = 1;
@@ -96,18 +96,27 @@ NineVertexBuffer9_ctor( struct NineVertexBuffer9 *This,
     pDesc->Format = D3DFMT_VERTEXDATA;
     This->desc = *pDesc;
 
+    This->data = align_malloc(pDesc->Size, 32);
+    if (!This->data)
+        return E_OUTOFMEMORY;
+
+    u_box_1d(0, This->desc.Size, &This->box);
+
     return D3D_OK;
 }
 
 void
 NineVertexBuffer9_dtor( struct NineVertexBuffer9 *This )
 {
-    if (This->maps) {
+    if (This->flags) {
         while (This->nmaps) {
             NineVertexBuffer9_Unlock(This);
         }
-        FREE(This->maps);
+        FREE(This->flags);
     }
+
+    if (This->data)
+        FREE(This->data);
 
     NineResource9_dtor(&This->base);
 }
@@ -119,14 +128,11 @@ NineVertexBuffer9_Lock( struct NineVertexBuffer9 *This,
                         void **ppbData,
                         DWORD Flags )
 {
-    struct pipe_box box;
-    void *data;
-    const unsigned usage = d3dlock_buffer_to_pipe_transfer_usage(Flags);
-
     DBG("This=%p(pipe=%p) OffsetToLock=0x%x, SizeToLock=0x%x, Flags=0x%x\n",
         This, This->base.resource,
         OffsetToLock, SizeToLock, Flags);
 
+    user_assert(OffsetToLock < This->desc.Size, D3DERR_INVALIDCALL);
     user_assert(ppbData, E_POINTER);
     user_assert(!(Flags & ~(D3DLOCK_DISCARD |
                             D3DLOCK_DONOTWAIT |
@@ -136,39 +142,24 @@ NineVertexBuffer9_Lock( struct NineVertexBuffer9 *This,
                             D3DLOCK_NOOVERWRITE)), D3DERR_INVALIDCALL);
 
     if (This->nmaps == This->maxmaps) {
-        struct pipe_transfer **newmaps =
-            REALLOC(This->maps, sizeof(struct pipe_transfer *)*This->maxmaps,
-                    sizeof(struct pipe_transfer *)*(This->maxmaps << 1));
+        struct map *newmaps =
+            REALLOC(This->flags, sizeof(DWORD)*This->maxmaps,
+                    sizeof(DWORD)*(This->maxmaps << 1));
         if (newmaps == NULL)
             return E_OUTOFMEMORY;
 
         This->maxmaps <<= 1;
-        This->maps = newmaps;
+        This->flags = newmaps;
     }
 
     if (SizeToLock == 0) {
         SizeToLock = This->desc.Size - OffsetToLock;
         user_warn(OffsetToLock != 0);
     }
-
-    u_box_1d(OffsetToLock, SizeToLock, &box);
-
-    data = This->pipe->transfer_map(This->pipe, This->base.resource, 0,
-                                    usage, &box, &This->maps[This->nmaps]);
-    if (!data) {
-        DBG("pipe::transfer_map failed\n"
-            " usage = %x\n"
-            " box.x = %u\n"
-            " box.width = %u\n",
-            usage, box.x, box.width);
-        /* not sure what to return, msdn suggests this */
-        if (Flags & D3DLOCK_DONOTWAIT)
-            return D3DERR_WASSTILLDRAWING;
-        return D3DERR_INVALIDCALL;
-    }
+    This->flags[This->nmaps] = Flags;
 
     This->nmaps++;
-    *ppbData = data;
+    *ppbData = ((unsigned char*)This->data) + OffsetToLock;
 
     return D3D_OK;
 }
@@ -177,9 +168,18 @@ HRESULT WINAPI
 NineVertexBuffer9_Unlock( struct NineVertexBuffer9 *This )
 {
     DBG("This=%p\n", This);
+    unsigned usage = PIPE_TRANSFER_WRITE;
 
     user_assert(This->nmaps > 0, D3DERR_INVALIDCALL);
-    This->pipe->transfer_unmap(This->pipe, This->maps[--(This->nmaps)]);
+    This->nmaps--;
+
+    if (This->flags[This->nmaps] & D3DLOCK_READONLY)
+        return D3D_OK;
+
+    if (This->flags[This->nmaps] & D3DLOCK_DISCARD)
+        usage |= PIPE_TRANSFER_DISCARD_WHOLE_RESOURCE;
+
+    This->pipe->transfer_inline_write(This->pipe, This->base.resource, 0, usage, &This->box, This->data, 0, 0 );
     return D3D_OK;
 }
 

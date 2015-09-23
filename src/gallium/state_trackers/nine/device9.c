@@ -1910,8 +1910,11 @@ NineDevice9_Clear( struct NineDevice9 *This,
 #endif
 
     if (Flags & D3DCLEAR_TARGET) bufs |= PIPE_CLEAR_COLOR;
-    if (Flags & D3DCLEAR_ZBUFFER) bufs |= PIPE_CLEAR_DEPTH;
-    if (Flags & D3DCLEAR_STENCIL) bufs |= PIPE_CLEAR_STENCIL;
+    /* Ignore Z buffer if not bound */
+    if (This->state.fb.zsbuf != NULL) {
+        if (Flags & D3DCLEAR_ZBUFFER) bufs |= PIPE_CLEAR_DEPTH;
+        if (Flags & D3DCLEAR_STENCIL) bufs |= PIPE_CLEAR_STENCIL;
+    }
     if (!bufs)
         return D3D_OK;
     d3dcolor_to_pipe_color_union(&rgba, Color);
@@ -1960,7 +1963,6 @@ NineDevice9_Clear( struct NineDevice9 *This,
         /* Case we clear depth buffer (and eventually rt too).
          * depth buffer size is always >= rt size. Compare to clear region */
         ((bufs & (PIPE_CLEAR_DEPTH | PIPE_CLEAR_STENCIL)) &&
-         This->state.fb.zsbuf != NULL &&
          rect.x2 >= zsbuf_surf->desc.Width &&
          rect.y2 >= zsbuf_surf->desc.Height))) {
         DBG("Clear fast path\n");

@@ -178,6 +178,14 @@ NineDevice9_ctor( struct NineDevice9 *This,
     /* Create first, it messes up our state. */
     This->hud = hud_create(This->pipe, This->cso); /* NULL result is fine */
 
+    /* init early, resource9 depends on it */
+    This->available_texture_mem = This->screen->get_param(This->screen, PIPE_CAP_VIDEO_MEMORY);
+    if (This->available_texture_mem < 4096)
+        This->available_texture_mem <<= 20;
+    else
+        This->available_texture_mem = UINT_MAX;
+    This->available_texture_limit = This->available_texture_mem * 20LL / 100LL;
+
     /* create implicit swapchains */
     This->nswapchains = ID3DPresentGroup_GetMultiheadCount(This->present);
     This->swapchains = CALLOC(This->nswapchains,
@@ -541,11 +549,9 @@ NineDevice9_TestCooperativeLevel( struct NineDevice9 *This )
 UINT WINAPI
 NineDevice9_GetAvailableTextureMem( struct NineDevice9 *This )
 {
-   const unsigned mem = This->screen->get_param(This->screen, PIPE_CAP_VIDEO_MEMORY);
-   if (mem < 4096)
-      return mem << 20;
-   else
-      return UINT_MAX;
+    /* Implement Windows 7 behavior and return device private memory counter.
+     * Windows XP shares this counter across multiple devices. */
+    return This->available_texture_mem;
 }
 
 HRESULT WINAPI

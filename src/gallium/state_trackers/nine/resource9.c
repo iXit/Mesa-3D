@@ -29,6 +29,7 @@
 
 #include "util/u_hash_table.h"
 #include "util/u_inlines.h"
+#include "util/u_resource.h"
 
 #include "nine_pdata.h"
 
@@ -77,6 +78,29 @@ NineResource9_ctor( struct NineResource9 *This,
     if (!This->pdata)
         return E_OUTOFMEMORY;
 
+    if (This->resource && (Pool == D3DPOOL_DEFAULT)) {
+        /* On Windows it is possible to allocate less than
+         * IDirect3DDevice9::GetAvailableTextureMem() bytes of memory.
+         *
+         * R600 allocates memory until applications, X for example, starts
+         * crashing because they run out of memory and some games allocate surfaces
+         * in a loop until they receive D3DERR_OUTOFVIDEOMEMORY to measure
+         * the available texture memory size.
+         *
+         * We are not using the drivers VRAM statistics because:
+         *  * This would add overhead to each resource allocation.
+         *  * Freeing memory is lazy and takes some time, but applications
+         *    expects the memory counter to change immediately after allocating
+         *    or freeing memory.
+         */
+        This->size = util_resource_size(This->resource);
+
+        This->base.device->available_texture_mem -= This->size;
+        if (This->base.device->available_texture_mem <=
+                This->base.device->available_texture_limit) {
+            return D3DERR_OUTOFVIDEOMEMORY;
+        }
+    }
     return D3D_OK;
 }
 
@@ -91,6 +115,10 @@ NineResource9_dtor( struct NineResource9 *This )
     /* NOTE: We do have to use refcounting, the driver might
      * still hold a reference. */
     pipe_resource_reference(&This->resource, NULL);
+
+    /* NOTE: It is OK to always add size, as it is 0 in case the
+     * ctor exited early. */
+    This->base.device->available_texture_mem += This->size;
 
     NineUnknown_dtor(&This->base);
 }

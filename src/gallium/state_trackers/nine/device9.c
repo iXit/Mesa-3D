@@ -1909,6 +1909,8 @@ NineDevice9_Clear( struct NineDevice9 *This,
         Count = 0;
 #endif
 
+    nine_update_state_framebuffer(This);
+
     if (Flags & D3DCLEAR_TARGET) bufs |= PIPE_CLEAR_COLOR;
     /* Ignore Z buffer if not bound */
     if (This->state.fb.zsbuf != NULL) {
@@ -1918,8 +1920,6 @@ NineDevice9_Clear( struct NineDevice9 *This,
     if (!bufs)
         return D3D_OK;
     d3dcolor_to_pipe_color_union(&rgba, Color);
-
-    nine_update_state_framebuffer(This);
 
     rect.x1 = This->state.viewport.X;
     rect.y1 = This->state.viewport.Y;

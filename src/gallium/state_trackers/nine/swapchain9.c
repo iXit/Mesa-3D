@@ -713,6 +713,10 @@ present( struct NineSwapChain9 *This,
         This->pipe->blit(This->pipe, &blit);
     }
 
+    // The resource we present has to resolve fast clears
+    // if needed (and other things)
+    This->pipe->flush_resource(This->pipe, resource);
+
     if (This->params.SwapEffect != D3DSWAPEFFECT_DISCARD)
         handle_draw_cursor_and_hud(This, resource);
 
@@ -737,12 +741,6 @@ bypass_rendering:
         if (still_draw)
             return D3DERR_WASSTILLDRAWING;
     }
-
-    if (This->present_buffers)
-        resource = This->present_buffers[0];
-    else
-        resource = This->buffers[0]->base.resource;
-    This->pipe->flush_resource(This->pipe, resource);
 
     if (!This->enable_threadpool) {
         This->tasks[0]=NULL;

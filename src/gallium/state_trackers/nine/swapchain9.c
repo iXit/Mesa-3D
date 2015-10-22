@@ -904,8 +904,11 @@ NineSwapChain9_GetBackBuffer( struct NineSwapChain9 *This,
     DBG("GetBackBuffer: This=%p iBackBuffer=%d Type=%d ppBackBuffer=%p\n",
         This, iBackBuffer, Type, ppBackBuffer);
     (void)user_error(Type == D3DBACKBUFFER_TYPE_MONO);
+    user_assert(ppBackBuffer != NULL, D3DERR_INVALIDCALL);
+    /* in case of error return NULL */
+    *ppBackBuffer = NULL;
+
     user_assert(iBackBuffer < This->params.BackBufferCount, D3DERR_INVALIDCALL);
-    user_assert(ppBackBuffer != NULL, E_POINTER);
 
     NineUnknown_AddRef(NineUnknown(This->buffers[iBackBuffer]));
     *ppBackBuffer = (IDirect3DSurface9 *)This->buffers[iBackBuffer];

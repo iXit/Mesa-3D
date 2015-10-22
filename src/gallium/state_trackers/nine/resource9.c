@@ -116,9 +116,11 @@ NineResource9_dtor( struct NineResource9 *This )
      * still hold a reference. */
     pipe_resource_reference(&This->resource, NULL);
 
-    /* NOTE: It is OK to always add size, as it is 0 in case the
-     * ctor exited early. */
-    This->base.device->available_texture_mem += This->size;
+    if (This->base.device) {
+        /* NOTE: It is OK to always add size, as it is 0 in case the
+         * ctor exited early. */
+        This->base.device->available_texture_mem += This->size;
+    }
 
     NineUnknown_dtor(&This->base);
 }

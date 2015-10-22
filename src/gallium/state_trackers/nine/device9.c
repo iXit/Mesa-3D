@@ -1110,6 +1110,8 @@ create_zs_or_rt_surface(struct NineDevice9 *This,
 
     user_assert(Width && Height, D3DERR_INVALIDCALL);
     user_assert(Pool != D3DPOOL_MANAGED, D3DERR_INVALIDCALL);
+    user_assert((Pool == D3DPOOL_SCRATCH) ||
+                ((Format != D3DFMT_ATI1) && (Format != D3DFMT_ATI2)), D3DERR_INVALIDCALL);
 
     templ.target = PIPE_TEXTURE_2D;
     templ.width0 = Width;

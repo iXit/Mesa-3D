@@ -637,6 +637,7 @@ static int replace_gpr_with_pv_ps(struct r600_bytecode *bc,
 
 void r600_bytecode_special_constants(uint32_t value, unsigned *sel, unsigned *neg, unsigned abs)
 {
+
 	switch(value) {
 	case 0:
 		*sel = V_SQ_ALU_SRC_0;

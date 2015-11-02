@@ -783,6 +783,19 @@ NineSwapChain9_Present( struct NineSwapChain9 *This,
     if (hr == D3DERR_WASSTILLDRAWING)
         return hr;
 
+    if (This->base.device->ex) {
+        if (NineSwapChain9_GetOccluded(This)) {
+            return S_PRESENT_OCCLUDED;
+        }
+    } else {
+        if (NineSwapChain9_GetOccluded(This)) {
+            This->base.device->device_needs_reset = TRUE;
+        }
+        if (This->base.device->device_needs_reset) {
+            return D3DERR_DEVICELOST;
+        }
+    }
+
     switch (This->params.SwapEffect) {
         case D3DSWAPEFFECT_FLIP:
             UNTESTED(4);

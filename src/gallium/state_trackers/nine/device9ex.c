@@ -100,12 +100,6 @@ NineDevice9Ex_PresentEx( struct NineDevice9Ex *This,
         This, pSourceRect, pDestRect, hDestWindowOverride,
         pDirtyRegion, dwFlags);
 
-
-    if (NineSwapChain9_GetOccluded(This->base.swapchains[0])) {
-        return S_PRESENT_OCCLUDED;
-    }
-
-
     for (i = 0; i < This->base.nswapchains; i++) {
         hr = NineSwapChain9_Present(This->base.swapchains[i], pSourceRect, pDestRect,
                                     hDestWindowOverride, pDirtyRegion, dwFlags);
@@ -124,9 +118,6 @@ NineDevice9Ex_Present( struct NineDevice9Ex *This,
 {
     DBG("This=%p pSourceRect=%p pDestRect=%p hDestWindowOverride=%p pDirtyRegion=%p\n",
         This, pSourceRect, pDestRect, hDestWindowOverride, pDirtyRegion);
-    if (NineSwapChain9_GetOccluded(This->base.swapchains[0])) {
-        return S_PRESENT_OCCLUDED;
-    }
 
     return NineDevice9_Present(&This->base, pSourceRect, pDestRect,
                                hDestWindowOverride, pDirtyRegion);

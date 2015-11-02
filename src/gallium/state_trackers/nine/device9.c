@@ -813,12 +813,6 @@ NineDevice9_Present( struct NineDevice9 *This,
     DBG("This=%p pSourceRect=%p pDestRect=%p hDestWindowOverride=%p pDirtyRegion=%p\n",
         This, pSourceRect, pDestRect, hDestWindowOverride, pDirtyRegion);
 
-    if (NineSwapChain9_GetOccluded(This->swapchains[0])) {
-        This->device_needs_reset = TRUE;
-    }
-
-    user_assert(!This->device_needs_reset, D3DERR_DEVICELOST);
-
     /* XXX is this right? */
     for (i = 0; i < This->nswapchains; ++i) {
         hr = NineSwapChain9_Present(This->swapchains[i], pSourceRect, pDestRect,

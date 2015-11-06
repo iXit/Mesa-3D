@@ -77,14 +77,17 @@ NineResource9_ctor( struct NineResource9 *This,
          *  * Freeing memory is lazy and takes some time, but applications
          *    expects the memory counter to change immediately after allocating
          *    or freeing memory.
+         *
+         * Vertexbuffers and indexbuffers are not accounted !
          */
+        if (This->info.target != PIPE_BUFFER) {
+            This->size = util_resource_size(&This->info);
 
-        This->size = util_resource_size(&This->info);
-
-        This->base.device->available_texture_mem -= This->size;
-        if (This->base.device->available_texture_mem <=
-                This->base.device->available_texture_limit) {
-            return D3DERR_OUTOFVIDEOMEMORY;
+            This->base.device->available_texture_mem -= This->size;
+            if (This->base.device->available_texture_mem <=
+                    This->base.device->available_texture_limit) {
+                return D3DERR_OUTOFVIDEOMEMORY;
+            }
         }
 
         DBG("(%p) Creating pipe_resource.\n", This);

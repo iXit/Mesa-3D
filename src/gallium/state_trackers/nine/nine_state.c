@@ -362,17 +362,18 @@ prepare_vs(struct NineDevice9 *device, uint8_t shader_changed)
 {
     struct nine_state *state = &device->state;
     struct NineVertexShader9 *vs = state->vs;
+    BOOL programmable_vs = vs && !(state->vdecl && state->vdecl->position_t);
     uint32_t changed_group = 0;
     int has_key_changed = 0;
 
-    if (likely(vs))
+    if (likely(programmable_vs))
         has_key_changed = NineVertexShader9_UpdateKey(vs, state);
 
     if (!shader_changed && !has_key_changed)
         return 0;
 
     /* likely because we dislike FF */
-    if (likely(vs)) {
+    if (likely(programmable_vs)) {
         state->cso.vs = NineVertexShader9_GetVariant(vs);
     } else {
         vs = device->ff.vs;
@@ -554,6 +555,7 @@ update_vertex_elements(struct NineDevice9 *device)
     struct nine_state *state = &device->state;
     const struct NineVertexDeclaration9 *vdecl = device->state.vdecl;
     const struct NineVertexShader9 *vs;
+    BOOL programmable_vs;
     unsigned n, b, i;
     int index;
     char vdecl_index_map[16]; /* vs->num_inputs <= 16 */
@@ -565,7 +567,8 @@ update_vertex_elements(struct NineDevice9 *device)
     state->stream_usage_mask = 0;
     memset(vdecl_index_map, -1, 16);
     memset(used_streams, 0, device->caps.MaxStreams);
-    vs = device->state.vs ? device->state.vs : device->ff.vs;
+    programmable_vs = device->state.vs && !(state->vdecl && state->vdecl->position_t);
+    vs = programmable_vs ? device->state.vs : device->ff.vs;
 
     if (vdecl) {
         for (n = 0; n < vs->num_inputs; ++n) {
@@ -851,8 +854,9 @@ static inline void
 commit_vs_constants(struct NineDevice9 *device)
 {
     struct pipe_context *pipe = device->pipe;
+    BOOL programmable_vs = device->state.vs && !(device->state.vdecl && device->state.vdecl->position_t);
 
-    if (unlikely(!device->state.vs))
+    if (unlikely(!programmable_vs))
         pipe->set_constant_buffer(pipe, PIPE_SHADER_VERTEX, 0, &device->state.pipe.cb_vs_ff);
     else
         pipe->set_constant_buffer(pipe, PIPE_SHADER_VERTEX, 0, &device->state.pipe.cb_vs);
@@ -949,6 +953,7 @@ nine_update_state(struct NineDevice9 *device)
 {
     struct pipe_context *pipe = device->pipe;
     struct nine_state *state = &device->state;
+    BOOL programmable_vs;
     uint32_t group;
 
     DBG("changed state groups: %x\n", state->changed.group);
@@ -961,8 +966,10 @@ nine_update_state(struct NineDevice9 *device)
      */
     validate_textures(device); /* may clobber state */
 
+    programmable_vs = state->vs && !(state->vdecl && state->vdecl->position_t);
+
     /* ff_update may change VS/PS dirty bits */
-    if (unlikely(!state->vs || !state->ps))
+    if (unlikely(!programmable_vs || !state->ps))
         nine_ff_update(device);
     group = state->changed.group;
 
@@ -995,12 +1002,12 @@ nine_update_state(struct NineDevice9 *device)
         if (group & (NINE_STATE_TEXTURE | NINE_STATE_SAMPLER))
             update_textures_and_samplers(device);
         if (device->prefer_user_constbuf) {
-            if ((group & (NINE_STATE_VS_CONST | NINE_STATE_VS)) && state->vs)
+            if ((group & (NINE_STATE_VS_CONST | NINE_STATE_VS)) && programmable_vs)
                 prepare_vs_constants_userbuf(device);
             if ((group & (NINE_STATE_PS_CONST | NINE_STATE_PS)) && state->ps)
                 prepare_ps_constants_userbuf(device);
         } else {
-            if ((group & NINE_STATE_VS_CONST) && state->vs)
+            if ((group & NINE_STATE_VS_CONST) && programmable_vs)
                 upload_constants(device, PIPE_SHADER_VERTEX);
             if ((group & NINE_STATE_PS_CONST) && state->ps)
                 upload_constants(device, PIPE_SHADER_FRAGMENT);

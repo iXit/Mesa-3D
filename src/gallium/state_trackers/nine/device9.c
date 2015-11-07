@@ -3221,12 +3221,16 @@ NineDevice9_SetVertexDeclaration( struct NineDevice9 *This,
                                   IDirect3DVertexDeclaration9 *pDecl )
 {
     struct nine_state *state = This->update;
+    BOOL had_position_t;
 
     DBG("This=%p pDecl=%p\n", This, pDecl);
 
     if (likely(!This->is_recording) && state->vdecl == NineVertexDeclaration9(pDecl))
         return D3D_OK;
+    had_position_t = state->vdecl && state->vdecl->position_t;
     nine_bind(&state->vdecl, pDecl);
+    if (had_position_t != (state->vdecl && state->vdecl->position_t))
+        state->changed.group |= NINE_STATE_VS | NINE_STATE_VS_CONST | NINE_STATE_FF;
 
     state->changed.group |= NINE_STATE_VDECL;
 

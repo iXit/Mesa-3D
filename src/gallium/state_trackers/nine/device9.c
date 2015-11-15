@@ -3166,7 +3166,7 @@ NineDevice9_ProcessVertices( struct NineDevice9 *This,
         buffer_offset = 0;
     } else {
         /* SO matches vertex declaration */
-        resource = dst->base.resource;
+        resource = NineVertexBuffer9_GetResource(dst);
         buffer_offset = DestIndex * vs->so->stride[0];
     }
     target = This->pipe->create_stream_output_target(This->pipe, resource,
@@ -3547,7 +3547,7 @@ NineDevice9_SetStreamSource( struct NineDevice9 *This,
         state->vtxbuf[i].stride = Stride;
         state->vtxbuf[i].buffer_offset = OffsetInBytes;
     }
-    state->vtxbuf[i].buffer = pStreamData ? pVBuf9->base.resource : NULL;
+    state->vtxbuf[i].buffer = pStreamData ? NineVertexBuffer9_GetResource(pVBuf9) : NULL;
 
     return D3D_OK;
 }

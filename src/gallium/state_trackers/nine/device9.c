@@ -2408,10 +2408,7 @@ NineDevice9_SetRenderState( struct NineDevice9 *This,
         }
     }
 
-    if (likely(nine_check_render_state_value(State, Value)))
-        state->rs[State] = Value;
-    else
-        state->rs[State] = nine_render_state_defaults[State];
+    state->rs[State] = nine_fix_render_state_value(State, Value);
     state->changed.rs[State / 32] |= 1 << (State % 32);
     state->changed.group |= nine_render_state_group[State];
 

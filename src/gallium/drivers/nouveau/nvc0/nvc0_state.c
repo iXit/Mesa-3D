@@ -1000,12 +1000,16 @@ nvc0_set_vertex_buffers(struct pipe_context *pipe,
     struct nvc0_context *nvc0 = nvc0_context(pipe);
     unsigned i;
 
+    if (nvc0->num_vtxbufs)
+        nouveau_bufctx_reset(nvc0->bufctx_3d, NVC0_BIND_VTX);
+
     util_set_vertex_buffers_count(nvc0->vtxbuf, &nvc0->num_vtxbufs, vb,
                                   start_slot, count);
 
     if (!vb) {
        nvc0->vbo_user &= ~(((1ull << count) - 1) << start_slot);
        nvc0->constant_vbos &= ~(((1ull << count) - 1) << start_slot);
+       nvc0->dirty |= NVC0_NEW_ARRAYS;
        return;
     }
 
@@ -1025,7 +1029,6 @@ nvc0_set_vertex_buffers(struct pipe_context *pipe,
     }
 
     nvc0->dirty |= NVC0_NEW_ARRAYS;
-    nouveau_bufctx_reset(nvc0->bufctx_3d, NVC0_BIND_VTX);
 }
 
 static void

@@ -48,7 +48,7 @@ static inline unsigned d3dlock_buffer_to_pipe_transfer_usage(DWORD Flags)
 {
     unsigned usage;
 
-    if (Flags & D3DLOCK_DISCARD)
+    if (Flags & D3DLOCK_DISCARD && !(Flags & D3DLOCK_NOOVERWRITE))
         usage = PIPE_TRANSFER_WRITE | PIPE_TRANSFER_DISCARD_WHOLE_RESOURCE;
     else
     if (Flags & D3DLOCK_READONLY)

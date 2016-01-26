@@ -92,12 +92,17 @@ NineSurface9_ctor( struct NineSurface9 *This,
     This->base.info.usage = PIPE_USAGE_DEFAULT;
     This->base.info.bind = PIPE_BIND_SAMPLER_VIEW;
     This->base.info.flags = 0;
-    This->base.info.format = d3d9_to_pipe_format_checked(This->base.info.screen,
-                                                         pDesc->Format,
-                                                         This->base.info.target,
-                                                         This->base.info.nr_samples,
-                                                         This->base.info.bind,
-                                                         FALSE);
+
+    if (pDesc->Pool != D3DPOOL_SCRATCH) {
+        This->base.info.format = d3d9_to_pipe_format_checked(This->base.info.screen,
+                                                             pDesc->Format,
+                                                             This->base.info.target,
+                                                             This->base.info.nr_samples,
+                                                             This->base.info.bind,
+                                                             FALSE);
+    } else {
+        This->base.info.format = d3d9_to_pipe_format_internal(pDesc->Format);
+    }
 
     if (pDesc->Usage & D3DUSAGE_RENDERTARGET)
         This->base.info.bind |= PIPE_BIND_RENDER_TARGET;

@@ -28,6 +28,8 @@
 
 #include "d3dadapter/d3dadapter9.h"
 
+struct NineSwapChain9;
+
 #include "threadpool.h"
 
 struct NineDevice9;
@@ -144,5 +146,14 @@ NineSwapChain9_GetOccluded( struct NineSwapChain9 *This );
 
 BOOL
 NineSwapChain9_ResolutionMismatch( struct NineSwapChain9 *This );
+
+HANDLE
+NineSwapChain9_CreateThread( struct NineSwapChain9 *This,
+                                 void *pFuncAddress,
+                                 void *pParam );
+
+void
+NineSwapChain9_WaitForThread( struct NineSwapChain9 *This,
+                                  HANDLE thread );
 
 #endif /* _NINE_SWAPCHAIN9_H_ */

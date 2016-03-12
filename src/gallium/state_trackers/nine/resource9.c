@@ -104,6 +104,8 @@ NineResource9_ctor( struct NineResource9 *This,
     if (!This->pdata)
         return E_OUTOFMEMORY;
 
+    if (This->pool == D3DPOOL_DEFAULT)
+        This->base.device->num_default_pool_resources++;
     return D3D_OK;
 }
 
@@ -115,6 +117,8 @@ NineResource9_dtor( struct NineResource9 *This )
     if (This->pdata) {
         util_hash_table_foreach(This->pdata, ht_guid_delete, NULL);
         util_hash_table_destroy(This->pdata);
+        if (This->pool == D3DPOOL_DEFAULT)
+            This->base.device->num_default_pool_resources--;
     }
 
     /* NOTE: We do have to use refcounting, the driver might

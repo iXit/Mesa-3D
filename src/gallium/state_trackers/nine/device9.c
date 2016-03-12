@@ -193,6 +193,8 @@ NineDevice9_ctor( struct NineDevice9 *This,
      * still succeeds when texture allocation fails. */
     This->available_texture_limit = This->available_texture_mem * 20LL / 100LL;
 
+    This->num_default_pool_resources = 0;
+
     /* create implicit swapchains */
     This->nswapchains = ID3DPresentGroup_GetMultiheadCount(This->present);
     This->swapchains = CALLOC(This->nswapchains,
@@ -796,7 +798,7 @@ NineDevice9_Reset( struct NineDevice9 *This,
                    D3DPRESENT_PARAMETERS *pPresentationParameters )
 {
     HRESULT hr = D3D_OK;
-    unsigned i;
+    unsigned i, num_swapchain_surfaces = 0;
 
     DBG("This=%p pPresentationParameters=%p\n", This, pPresentationParameters);
 
@@ -814,6 +816,17 @@ NineDevice9_Reset( struct NineDevice9 *This,
 
     nine_pipe_context_clear(This);
     nine_state_clear(&This->state, TRUE);
+
+    /* We must test after the state was cleared for accurate count */
+    for (i = 0; i < This->nswapchains; ++i) {
+        if (!NineSwapChain9_CheckSurfaceReferences(This->swapchains[i], &num_swapchain_surfaces))
+            hr = D3DERR_INVALIDCALL;
+    }
+
+    /* The only remaining default pool resources allowed are from
+     * swapchain internal surfaces */
+    if (This->num_default_pool_resources != num_swapchain_surfaces)
+        hr = D3DERR_INVALIDCALL;
 
     NineDevice9_SetDefaultState(This, TRUE);
     NineDevice9_SetRenderTarget(

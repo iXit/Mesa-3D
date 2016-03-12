@@ -142,6 +142,10 @@ NineSwapChain9_GetPresentParameters( struct NineSwapChain9 *This,
                                      D3DPRESENT_PARAMETERS *pPresentationParameters );
 
 BOOL
+NineSwapChain9_CheckSurfaceReferences( struct NineSwapChain9 *This,
+                                       unsigned *swapchain_surfaces_counter );
+
+BOOL
 NineSwapChain9_GetOccluded( struct NineSwapChain9 *This );
 
 BOOL

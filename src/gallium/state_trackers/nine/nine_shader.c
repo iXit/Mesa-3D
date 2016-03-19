@@ -2040,6 +2040,7 @@ DECL_SPECIAL(DCL)
             if (sem.usage == D3DDECLUSAGE_POSITIONT)
                 tx->info->position_t = TRUE;
             assert(sem.reg.idx < Elements(tx->regs.o));
+            assert(ureg_dst_is_undef(tx->regs.o[sem.reg.idx]) && "Nine doesn't support yet packing");
             tx->regs.o[sem.reg.idx] = ureg_DECL_output_masked(
                 ureg, tgsi.Name, tgsi.Index, sem.reg.mask, 0, 1);
 
@@ -2053,6 +2054,7 @@ DECL_SPECIAL(DCL)
             unsigned interp_location = 0;
             /* SM3 only, SM2 input semantic determined by file */
             assert(sem.reg.idx < Elements(tx->regs.v));
+            assert(ureg_src_is_undef(tx->regs.v[sem.reg.idx]) && "Nine doesn't support yet packing");
             /* PositionT and tessfactor forbidden */
             if (sem.usage == D3DDECLUSAGE_POSITIONT || sem.usage == D3DDECLUSAGE_TESSFACTOR)
                 return D3DERR_INVALIDCALL;
@@ -3236,6 +3238,8 @@ tx_ctor(struct shader_translator *tx, struct nine_shader_info *info)
     tx->regs.vFace = ureg_src_undef();
     for (i = 0; i < Elements(tx->regs.o); ++i)
         tx->regs.o[i] = ureg_dst_undef();
+    for (i = 0; i < Elements(tx->regs.v); ++i)
+        tx->regs.v[i] = ureg_src_undef();
     for (i = 0; i < Elements(tx->regs.oCol); ++i)
         tx->regs.oCol[i] = ureg_dst_undef();
     for (i = 0; i < Elements(tx->regs.vC); ++i)

@@ -280,6 +280,11 @@ llvmpipe_get_param(struct pipe_screen *screen, enum pipe_cap param)
       if (!os_get_total_physical_memory(&system_memory))
          return 0;
 
+#ifdef PIPE_ARCH_X86
+      /* cap to 2 GB on 32 bits system */
+      system_memory = MIN2(system_memory, 2048 << 20);
+#endif
+
       return (int)(system_memory >> 20);
    }
    case PIPE_CAP_UMA:

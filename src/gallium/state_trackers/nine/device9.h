@@ -143,7 +143,6 @@ struct NineDevice9
     int minor_version_num;
     long long available_texture_mem;
     long long available_texture_limit;
-    unsigned num_default_pool_resources;
 };
 static inline struct NineDevice9 *
 NineDevice9( void *data )

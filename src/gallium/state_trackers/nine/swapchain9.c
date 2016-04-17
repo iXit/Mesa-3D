@@ -1011,29 +1011,6 @@ NineSwapChain9_new( struct NineDevice9 *pDevice,
 }
 
 BOOL
-NineSwapChain9_CheckSurfaceReferences( struct NineSwapChain9 *This,
-                                       unsigned *swapchain_surfaces_counter )
-{
-    unsigned i;
-
-    /* refs and bind should be 0, meaning there is no reference outside the
-     * swapchain (as the surfaces have a container, they don't get deleted
-     * because their refs/bind are 0) */
-    for (i = 0; i <= This->params.BackBufferCount; i++) {
-        if (This->buffers[i]->base.base.refs != 0 || This->buffers[i]->base.base.bind != 0)
-            return FALSE;
-    }
-    *swapchain_surfaces_counter += This->params.BackBufferCount + 1;
-
-    if (This->zsbuf) {
-        if (This->zsbuf->base.base.refs != 0 || This->zsbuf->base.base.bind != 0)
-            return FALSE;
-        *swapchain_surfaces_counter += 1;
-    }
-    return TRUE;
-}
-
-BOOL
 NineSwapChain9_GetOccluded( struct NineSwapChain9 *This )
 {
     if (This->base.device->minor_version_num > 0) {

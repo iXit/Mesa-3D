@@ -45,7 +45,7 @@ ninedir = $(D3D_DRIVER_INSTALL_DIR)
 nine_LTLIBRARIES = d3dadapter9.la
 
 pkgconfigdir = $(libdir)/pkgconfig
-pkgconfig_DATA = d3d.pc
+pkgconfig_DATA = d3dadapter9.pc
 
 d3dadapter9_la_SOURCES = \
 	description.c \

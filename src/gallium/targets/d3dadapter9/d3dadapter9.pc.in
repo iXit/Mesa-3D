@@ -4,8 +4,8 @@ libdir=@libdir@
 includedir=@includedir@
 moduledir=@D3D_DRIVER_INSTALL_DIR@
 
-Name: d3d
-Description: Native D3D driver modules
+Name: d3dadapter9
+Description: Native D3D9 driver modules
 Version: @NINE_VERSION@
 Requires.private: @DRI_PC_REQ_PRIV@
 Cflags: -I${includedir}

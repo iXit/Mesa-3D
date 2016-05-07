@@ -147,7 +147,7 @@ util_framebuffer_min_size(const struct pipe_framebuffer_state *fb,
       h = MIN2(h, fb->zsbuf->height);
    }
 
-   if (w == ~0u) {
+   if (w == ~0) {
       *width = 0;
       *height = 0;
       return FALSE;

@@ -57,36 +57,19 @@
 
 #if defined(PIPE_CC_GCC) && (defined(PIPE_ARCH_X86) || defined(PIPE_ARCH_X86_64))
 
-#include <features.h>
-
-typedef unsigned int fpu_control_t __attribute__ ((__mode__ (__HI__)));
-
-/* masking of interrupts */
-#define _FPU_MASK_IM  0x01
-#define _FPU_MASK_DM  0x02
-#define _FPU_MASK_ZM  0x04
-#define _FPU_MASK_OM  0x08
-#define _FPU_MASK_UM  0x10
-#define _FPU_MASK_PM  0x20
-/* precision control */
-#define _FPU_SINGLE   0x0
-/* rounding control */
-#define _FPU_RC_NEAREST 0x0
-/* Reserved bits in cw */
-#define _FPU_RESERVED 0xF0C0
+#include <stdint.h>
 
 static void nine_setup_fpu()
 {
-    fpu_control_t c;
+    uint16_t c;
 
     __asm__ __volatile__ ("fnstcw %0" : "=m" (*&c));
 
     /* clear the control word */
-    c &= _FPU_RESERVED;
+    c &= 0xF0C0;
     /* d3d9 doc/wine tests: mask all exceptions, use single-precision
      * and round to nearest */
-    c |= _FPU_MASK_IM | _FPU_MASK_DM | _FPU_MASK_ZM | _FPU_MASK_OM |
-         _FPU_MASK_UM | _FPU_MASK_PM | _FPU_SINGLE | _FPU_RC_NEAREST;
+    c |= 0x01 | 0x02 | 0x04 | 0x08 | 0x10 | 0x20 | 0x0 | 0x0;
 
     __asm__ __volatile__ ("fldcw %0" : : "m" (*&c));
 }

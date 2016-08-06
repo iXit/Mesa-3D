@@ -282,7 +282,7 @@ llvmpipe_get_param(struct pipe_screen *screen, enum pipe_cap param)
 
 #ifdef PIPE_ARCH_X86
       /* cap to 2 GB on 32 bits system */
-      system_memory = MIN2(system_memory, 2048);
+      system_memory = MIN2(system_memory, 2048 << 20);
 #endif
 
       return (int)(system_memory >> 20);

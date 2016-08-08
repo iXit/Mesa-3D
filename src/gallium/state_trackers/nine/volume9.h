@@ -55,9 +55,6 @@ struct NineVolume9
     unsigned lock_count;
 
     struct pipe_context *pipe;
-
-    /* for [GS]etPrivateData/FreePrivateData */
-    struct util_hash_table *pdata;
 };
 static inline struct NineVolume9 *
 NineVolume9( void *data )

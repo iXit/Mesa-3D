@@ -699,6 +699,20 @@ nvc0_validate_rast_fb(struct nvc0_context *nvc0)
    if (!rast)
       return;
 
+   /* Disable POLYGON_OFFSET in case no depth stencil is bound. */
+   if (!fb->zsbuf) {
+       BEGIN_NVC0(push, NVC0_3D(POLYGON_OFFSET_POINT_ENABLE), 3);
+       PUSH_DATA    (push, 0);
+       PUSH_DATA    (push, 0);
+       PUSH_DATA    (push, 0);
+       return;
+   } else {
+       BEGIN_NVC0(push, NVC0_3D(POLYGON_OFFSET_POINT_ENABLE), 3);
+       PUSH_DATA    (push, rast->offset_point);
+       PUSH_DATA    (push, rast->offset_line);
+       PUSH_DATA    (push, rast->offset_tri);
+   }
+
    if (rast->offset_units_unscaled) {
       BEGIN_NVC0(push, NVC0_3D(POLYGON_OFFSET_UNITS), 1);
       if (fb->zsbuf && fb->zsbuf->format == PIPE_FORMAT_Z16_UNORM)

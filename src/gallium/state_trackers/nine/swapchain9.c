@@ -293,8 +293,6 @@ NineSwapChain9_Resize( struct NineSwapChain9 *This,
             DBG("Failed to create pipe_resource.\n");
             return D3DERR_OUTOFVIDEOMEMORY;
         }
-        if (pParams->Flags & D3DPRESENTFLAG_LOCKABLE_BACKBUFFER)
-            resource->flags |= NINE_RESOURCE_FLAG_LOCKABLE;
         if (This->buffers[i]) {
             NineSurface9_SetResourceResize(This->buffers[i], resource);
             if (has_present_buffers)
@@ -312,6 +310,9 @@ NineSwapChain9_Resize( struct NineSwapChain9 *This,
             }
             This->buffers[i]->base.base.forward = FALSE;
         }
+        if (pParams->Flags & D3DPRESENTFLAG_LOCKABLE_BACKBUFFER)
+            NineSurface9_SetLockable(This->buffers[i]);
+
         if (has_present_buffers) {
             tmplt.format = PIPE_FORMAT_B8G8R8X8_UNORM;
             tmplt.bind = NINE_BIND_PRESENTBUFFER_FLAGS;

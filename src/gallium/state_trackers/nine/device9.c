@@ -1218,16 +1218,19 @@ create_zs_or_rt_surface(struct NineDevice9 *This,
         user_assert(templ.format != PIPE_FORMAT_NONE, D3DERR_INVALIDCALL);
         resource = screen->resource_create(screen, &templ);
         user_assert(resource, D3DERR_OUTOFVIDEOMEMORY);
-        if (Discard_or_Lockable && (desc.Usage & D3DUSAGE_RENDERTARGET))
-            resource->flags |= NINE_RESOURCE_FLAG_LOCKABLE;
     } else {
         resource = NULL;
     }
     hr = NineSurface9_new(This, NULL, resource, NULL, 0, 0, 0, &desc, &surface);
     pipe_resource_reference(&resource, NULL);
 
-    if (SUCCEEDED(hr))
+    if (SUCCEEDED(hr)) {
         *ppSurface = (IDirect3DSurface9 *)surface;
+
+        if (Discard_or_Lockable && (type != 1))
+            NineSurface9_SetLockable(surface);
+    }
+
     return hr;
 }
 

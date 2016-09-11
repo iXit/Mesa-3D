@@ -29,6 +29,7 @@
 #include "util/list.h"
 #include "util/u_rect.h"
 #include "util/u_inlines.h"
+#include "nine_defines.h"
 
 struct NineSurface9
 {
@@ -142,6 +143,15 @@ static inline boolean
 NineSurface9_IsOffscreenPlain (struct NineSurface9 *This )
 {
     return This->base.usage == 0 && !This->texture;
+}
+
+static inline void
+NineSurface9_SetLockable ( struct NineSurface9 *This )
+{
+#ifdef NINE_STRICT
+    if (This->base.resource)
+        This->base.resource->flags |= NINE_RESOURCE_FLAG_LOCKABLE;
+#endif
 }
 
 #ifdef DEBUG

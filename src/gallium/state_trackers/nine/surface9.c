@@ -137,8 +137,7 @@ NineSurface9_ctor( struct NineSurface9 *This,
             return E_OUTOFMEMORY;
     }
 
-    if (pResource && (pDesc->Usage & D3DUSAGE_DYNAMIC))
-        pResource->flags |= NINE_RESOURCE_FLAG_LOCKABLE;
+
 
     hr = NineResource9_ctor(&This->base, pParams, pResource, FALSE, D3DRTYPE_SURFACE,
                             pDesc->Pool, pDesc->Usage);
@@ -156,8 +155,8 @@ NineSurface9_ctor( struct NineSurface9 *This,
 
     This->stride = nine_format_get_stride(This->base.info.format, pDesc->Width);
 
-    if (pResource && NineSurface9_IsOffscreenPlain(This))
-        pResource->flags |= NINE_RESOURCE_FLAG_LOCKABLE;
+    if (pDesc->Usage & D3DUSAGE_DYNAMIC)
+        NineSurface9_SetLockable(This);
 
     /* TODO: investigate what else exactly needs to be cleared */
     if (This->base.resource && (pDesc->Usage & D3DUSAGE_RENDERTARGET)) {

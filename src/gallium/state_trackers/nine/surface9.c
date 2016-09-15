@@ -63,14 +63,15 @@ NineSurface9_ctor( struct NineSurface9 *This,
 
     /* Mark this as a special surface held by another internal resource. */
     pParams->container = pContainer;
+    /* Make sure there's a Desc */
+    assert(pDesc);
 
+    /* D3DUSAGE_DYNAMIC isn't allowed on managed buffers */
     user_assert(!(pDesc->Usage & D3DUSAGE_DYNAMIC) ||
                 (pDesc->Pool != D3DPOOL_MANAGED), D3DERR_INVALIDCALL);
 
-    assert(pResource || (user_buffer && pDesc->Pool != D3DPOOL_DEFAULT) ||
-           (!pContainer && pDesc->Pool != D3DPOOL_DEFAULT) ||
-           pDesc->Format == D3DFMT_NULL);
-
+    assert(pResource || pDesc->Pool != D3DPOOL_DEFAULT ||
+           pDesc->Format == D3DFMT_NULL || !pContainer);
     assert(!pResource || !user_buffer);
     assert(!user_buffer || pDesc->Pool != D3DPOOL_DEFAULT);
     /* The only way we can have !pContainer is being created
@@ -78,6 +79,10 @@ NineSurface9_ctor( struct NineSurface9 *This,
     assert(pContainer || (Level == 0 && Layer == 0 && TextureType == 0));
     /* Make sure no resource is passed for pool systemmem */
     assert(pDesc->Pool != D3DPOOL_SYSTEMMEM || !pResource);
+    /* Make sure no resource is passed for pool scratch */
+    assert(pDesc->Pool != D3DPOOL_SCRATCH || !pResource);
+    /* Make sure no resource is passed for offscreenplain */
+    assert(pContainer || !pResource);
 
     This->data = (uint8_t *)user_buffer;
 
@@ -91,6 +96,13 @@ NineSurface9_ctor( struct NineSurface9 *This,
     This->base.info.nr_samples = pDesc->MultiSampleType;
     This->base.info.usage = PIPE_USAGE_DEFAULT;
     This->base.info.bind = PIPE_BIND_SAMPLER_VIEW;
+    if (!pContainer) {
+        if (pDesc->Usage & D3DUSAGE_RENDERTARGET) {
+            This->base.info.bind |= PIPE_BIND_RENDER_TARGET;
+        } else if (pDesc->Usage & D3DUSAGE_DEPTHSTENCIL) {
+            This->base.info.bind = d3d9_get_pipe_depth_format_bindings(pDesc->Format);
+        }
+    }
     This->base.info.flags = 0;
     This->base.info.format = d3d9_to_pipe_format_checked(This->base.info.screen,
                                                          pDesc->Format,
@@ -99,7 +111,19 @@ NineSurface9_ctor( struct NineSurface9 *This,
                                                          This->base.info.bind,
                                                          FALSE,
                                                          pDesc->Pool == D3DPOOL_SCRATCH);
+    if (!pContainer) {
+        if (This->base.info.format == PIPE_FORMAT_NONE && pDesc->Format != D3DFMT_NULL)
+            return D3DERR_INVALIDCALL;
 
+        if (compressed_format(pDesc->Format)) {
+            const unsigned w = util_format_get_blockwidth(This->base.info.format);
+            const unsigned h = util_format_get_blockheight(This->base.info.format);
+
+            user_assert(!(pDesc->Width % w) && !(pDesc->Height % h), D3DERR_INVALIDCALL);
+        }
+    }
+
+    This->base.info.bind = PIPE_BIND_SAMPLER_VIEW;
     if (pDesc->Usage & D3DUSAGE_RENDERTARGET)
         This->base.info.bind |= PIPE_BIND_RENDER_TARGET;
     if (pDesc->Usage & D3DUSAGE_DEPTHSTENCIL)
@@ -125,22 +149,26 @@ NineSurface9_ctor( struct NineSurface9 *This,
                                                          pDesc->Width);
     }
 
-    /* Ram buffer with no parent. Has to allocate the resource itself */
-    if (!pResource && !pContainer) {
-        assert(!user_buffer);
-        This->data = align_malloc(
-            nine_format_get_level_alloc_size(This->base.info.format,
-                                             pDesc->Width,
-                                             pDesc->Height,
-                                             0), 32);
-        if (!This->data)
-            return E_OUTOFMEMORY;
+    if (!pContainer) {
+        if (pDesc->Pool != D3DPOOL_DEFAULT) {
+            /* Ram buffer with no parent. Has to allocate the resource itself */
+            assert(!user_buffer);
+            This->data = align_malloc(
+                nine_format_get_level_alloc_size(This->base.info.format,
+                                                 pDesc->Width,
+                                                 pDesc->Height,
+                                                 0), 32);
+            if (!This->data)
+                return E_OUTOFMEMORY;
+        }
+
+        hr = NineResource9_ctor(&This->base, pParams, NULL, pDesc->Pool == D3DPOOL_DEFAULT,
+                                D3DRTYPE_SURFACE, pDesc->Pool, pDesc->Usage);
+    } else {
+        hr = NineResource9_ctor(&This->base, pParams, pResource, FALSE, D3DRTYPE_SURFACE,
+                                pDesc->Pool, pDesc->Usage);
     }
 
-
-
-    hr = NineResource9_ctor(&This->base, pParams, pResource, FALSE, D3DRTYPE_SURFACE,
-                            pDesc->Pool, pDesc->Usage);
     if (FAILED(hr))
         return hr;
 

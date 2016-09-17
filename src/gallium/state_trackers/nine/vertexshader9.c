@@ -167,6 +167,7 @@ NineVertexShader9_GetVariant( struct NineVertexShader9 *This )
         info.fog_enable = device->state.rs[D3DRS_FOGENABLE];
         info.point_size_min = asfloat(device->state.rs[D3DRS_POINTSIZE_MIN]);
         info.point_size_max = asfloat(device->state.rs[D3DRS_POINTSIZE_MAX]);
+        info.swvp_on = false;
 
         hr = nine_translate_shader(This->base.device, &info);
         if (FAILED(hr))

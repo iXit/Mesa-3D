@@ -61,6 +61,8 @@ NinePixelShader9_ctor( struct NinePixelShader9 *This,
     info.projected = 0;
 
     hr = nine_translate_shader(device, &info);
+    if (hr == D3DERR_INVALIDCALL)
+        ERR("Encountered buggy shader\n");
     if (FAILED(hr))
         return hr;
     This->byte_code.version = info.version;

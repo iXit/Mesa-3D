@@ -3498,7 +3498,6 @@ nine_translate_shader(struct NineDevice9 *device, struct nine_shader_info *info)
     tx->parse++; /* for byte_size */
 
     if (tx->failure) {
-        ERR("Encountered buggy shader\n");
         ureg_destroy(tx->ureg);
         hr = D3DERR_INVALIDCALL;
         goto out;
@@ -3616,8 +3615,8 @@ nine_translate_shader(struct NineDevice9 *device, struct nine_shader_info *info)
     } else {
          ureg_DECL_constant2D(tx->ureg, 0, 4095, 0);
          ureg_DECL_constant2D(tx->ureg, 0, 4095, 1);
-         ureg_DECL_constant2D(tx->ureg, 0, 1023, 2);
-         ureg_DECL_constant2D(tx->ureg, 0, 255, 3);
+         ureg_DECL_constant2D(tx->ureg, 0, 2047, 2);
+         ureg_DECL_constant2D(tx->ureg, 0, 511, 3);
     }
 
     if (debug_get_bool_option("NINE_TGSI_DUMP", FALSE)) {

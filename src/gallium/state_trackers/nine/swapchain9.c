@@ -340,55 +340,25 @@ NineSwapChain9_Resize( struct NineSwapChain9 *This,
         pipe_resource_reference(&resource, NULL);
     }
     if (pParams->EnableAutoDepthStencil) {
-        tmplt.bind = d3d9_get_pipe_depth_format_bindings(pParams->AutoDepthStencilFormat);
-        /* Checking the d3d9 depth format for texture support indicates the app if it can use
-         * the format for shadow mapping or texturing. If the check returns true, then the app
-         * is allowed to use this functionnality, so try first to create the buffer
-         * with PIPE_BIND_SAMPLER_VIEW. If the format can't be created with it, try without.
-         * If it fails with PIPE_BIND_SAMPLER_VIEW, then the app check for texture support
-         * would fail too, so we are fine. */
-        tmplt.bind |= PIPE_BIND_SAMPLER_VIEW;
-        tmplt.nr_samples = pParams->MultiSampleType;
-        tmplt.format = d3d9_to_pipe_format_checked(This->screen,
-                                                   pParams->AutoDepthStencilFormat,
-                                                   PIPE_TEXTURE_2D,
-                                                   tmplt.nr_samples,
-                                                   tmplt.bind,
-                                                   FALSE, FALSE);
-        if (tmplt.format == PIPE_FORMAT_NONE) {
-            tmplt.bind &= ~PIPE_BIND_SAMPLER_VIEW;
-            tmplt.format = d3d9_to_pipe_format_checked(This->screen,
-                                                       pParams->AutoDepthStencilFormat,
-                                                       PIPE_TEXTURE_2D,
-                                                       tmplt.nr_samples,
-                                                       tmplt.bind,
-                                                       FALSE, FALSE);
-        }
-
-        if (tmplt.format == PIPE_FORMAT_NONE)
-            return D3DERR_INVALIDCALL;
-
-        resource = This->screen->resource_create(This->screen, &tmplt);
-        if (!resource) {
-            DBG("Failed to create pipe_resource for depth buffer.\n");
-            return D3DERR_OUTOFVIDEOMEMORY;
-        }
         if (This->zsbuf) {
-            NineSurface9_SetResourceResize(This->zsbuf, resource);
-            pipe_resource_reference(&resource, NULL);
-        } else {
-            /* XXX wine thinks the container of this should be the device */
-            desc.Format = pParams->AutoDepthStencilFormat;
-            desc.Usage = D3DUSAGE_DEPTHSTENCIL;
-            hr = NineSurface9_new(pDevice, NineUnknown(pDevice), resource, NULL, 0,
-                                  0, 0, &desc, &This->zsbuf);
-            pipe_resource_reference(&resource, NULL);
-            if (FAILED(hr)) {
-                DBG("Failed to create ZS surface.\n");
-                return hr;
-            }
-            This->zsbuf->base.base.forward = FALSE;
+            NineUnknown_Unbind(NineUnknown(This->zsbuf));
         }
+
+        hr = NineDevice9_CreateDepthStencilSurface(pDevice,
+                                                   pParams->BackBufferWidth,
+                                                   pParams->BackBufferHeight,
+                                                   pParams->AutoDepthStencilFormat,
+                                                   pParams->MultiSampleType,
+                                                   pParams->MultiSampleQuality,
+                                                   0,
+                                                   (IDirect3DSurface9 **)&This->zsbuf,
+                                                   NULL);
+
+        if (FAILED(hr)) {
+            DBG("Failed to create ZS surface.\n");
+            return hr;
+        }
+        NineUnknown_ConvertRefToBind(NineUnknown(This->zsbuf));
     }
 
     This->params = *pParams;
@@ -507,7 +477,7 @@ NineSwapChain9_dtor( struct NineSwapChain9 *This )
         }
     }
     if (This->zsbuf)
-        NineUnknown_Destroy(NineUnknown(This->zsbuf));
+        NineUnknown_Unbind(NineUnknown(This->zsbuf));
 
     if (This->present)
         ID3DPresent_Release(This->present);

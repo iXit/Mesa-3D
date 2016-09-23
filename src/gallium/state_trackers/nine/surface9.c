@@ -112,6 +112,13 @@ NineSurface9_ctor( struct NineSurface9 *This,
         if (pDesc->Usage & D3DUSAGE_RENDERTARGET) {
             This->base.info.bind |= PIPE_BIND_RENDER_TARGET;
         } else if (pDesc->Usage & D3DUSAGE_DEPTHSTENCIL) {
+            /* XXX: Checking the d3d9 depth format for texture support indicates the app if it can use
+             * the format for shadow mapping or texturing. If the check returns true, then the app
+             * is allowed to use this functionnality, so try first to create the buffer
+             * with PIPE_BIND_SAMPLER_VIEW. If the format can't be created with it, try without.
+             * If it fails with PIPE_BIND_SAMPLER_VIEW, then the app check for texture support
+             * would fail too, so we are fine. */
+
             This->base.info.bind = d3d9_get_pipe_depth_format_bindings(pDesc->Format);
         }
     }

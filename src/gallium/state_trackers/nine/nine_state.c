@@ -712,6 +712,13 @@ update_sampler_derived(struct nine_state *state, unsigned s)
         state->samp[s][NINED3DSAMP_SHADOW] = state->texture[s]->shadow;
     }
 
+    if (state->samp[s][NINED3DSAMP_CUBETEX] !=
+        (NineResource9(state->texture[s])->type == D3DRTYPE_CUBETEXTURE)) {
+        changed = TRUE;
+        state->samp[s][NINED3DSAMP_CUBETEX] =
+                NineResource9(state->texture[s])->type == D3DRTYPE_CUBETEXTURE;
+    }
+
     if (state->samp[s][D3DSAMP_MIPFILTER] != D3DTEXF_NONE) {
         int lod = state->samp[s][D3DSAMP_MAXMIPLEVEL] - state->texture[s]->managed.lod;
         if (lod < 0)

@@ -540,6 +540,10 @@ create_present_buffer( struct NineSwapChain9 *This,
     *resource = This->screen->resource_create(This->screen, &tmplt);
 
     *present_handle = D3DWindowBuffer_create(This, *resource, 24, true);
+
+    if (!*present_handle) {
+        pipe_resource_reference(resource, NULL);
+    }
 }
 
 static void
@@ -875,6 +879,10 @@ NineSwapChain9_GetFrontBufferData( struct NineSwapChain9 *This,
      * to match. However it's not very clear what should get taken in Windowed
      * mode. It may need a fix */
     create_present_buffer(This, width, height, &temp_resource, &temp_handle);
+
+    if (!temp_resource || !temp_handle) {
+        return D3DERR_INVALIDCALL;
+    }
 
     desc.Type = D3DRTYPE_SURFACE;
     desc.Pool = D3DPOOL_DEFAULT;

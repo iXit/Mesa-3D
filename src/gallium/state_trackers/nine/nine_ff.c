@@ -1322,6 +1322,7 @@ nine_ff_build_ps(struct NineDevice9 *device, struct nine_ff_ps_key *key)
     ps.rCur = ureg_DECL_temporary(ureg);
     ps.rTmp = ureg_DECL_temporary(ureg);
     ps.rTex = ureg_DECL_temporary(ureg);
+    ureg_MOV(ureg, ps.rTmp, ureg_imm1f(ureg, 0.0f));
     ps.rCurSrc = ureg_src(ps.rCur);
     ps.rTmpSrc = ureg_src(ps.rTmp);
     ps.rTexSrc = ureg_src(ps.rTex);

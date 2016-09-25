@@ -318,7 +318,9 @@ nv50_program_create_strmout_state(const struct nv50_ir_prog_info *info,
 }
 
 bool
-nv50_program_translate(struct nv50_program *prog, uint16_t chipset,
+nv50_program_translate(struct nv50_program *prog,
+                       bool half_pixel_center,
+                       uint16_t chipset,
                        struct pipe_debug_callback *debug)
 {
    struct nv50_ir_prog_info *info;
@@ -334,6 +336,7 @@ nv50_program_translate(struct nv50_program *prog, uint16_t chipset,
    info->bin.sourceRep = NV50_PROGRAM_IR_TGSI;
    info->bin.source = (void *)prog->pipe.tokens;
 
+   info->io.halfPixelCenter = half_pixel_center;
    info->io.auxCBSlot = 15;
    info->io.ucpBase = NV50_CB_AUX_UCP_OFFSET;
    info->io.genUserClip = prog->vp.clpd_nr;

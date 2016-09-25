@@ -763,8 +763,11 @@ nv50_sp_state_create(struct pipe_context *pipe,
    if (cso->stream_output.num_outputs)
       prog->pipe.stream_output = cso->stream_output;
 
+   bool half_pixel_center = nv50_context(pipe)->rast ?
+      nv50_context(pipe)->rast->pipe.half_pixel_center : true;
    prog->translated = nv50_program_translate(
-         prog, nv50_context(pipe)->screen->base.device->chipset,
+         prog, half_pixel_center,
+         nv50_context(pipe)->screen->base.device->chipset,
          &nouveau_context(pipe)->debug);
 
    return (void *)prog;

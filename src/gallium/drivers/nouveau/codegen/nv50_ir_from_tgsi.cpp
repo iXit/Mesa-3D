@@ -1707,11 +1707,11 @@ Converter::translateInterpMode(const struct nv50_ir_varying *var, operation& op)
 Value *
 Converter::interpolate(tgsi::Instruction::SrcRegister src, int c, Value *ptr)
 {
+   const struct nv50_ir_varying *var = &info->in[ptr ? 0 : src.getIndex(0)];
    operation op;
 
    // XXX: no way to know interpolation mode if we don't know what's accessed
-   const uint8_t mode = translateInterpMode(&info->in[ptr ? 0 :
-                                                      src.getIndex(0)], op);
+   const uint8_t mode = translateInterpMode(var, op);
 
    Instruction *insn = new_Instruction(func, op, TYPE_F32);
 
@@ -1725,7 +1725,17 @@ Converter::interpolate(tgsi::Instruction::SrcRegister src, int c, Value *ptr)
    insn->setInterpolate(mode);
 
    bb->insertTail(insn);
-   return insn->getDef(0);
+   if (var->sn == TGSI_SEMANTIC_POSITION && c < 2 && !info->io.halfPixelCenter) {
+      // If half-pixel centers is disabled, the rest of the infrastructure
+      // still expects these to be reported at a 0.5 offset. Add that in.
+      //
+      // NOTE: This is only ever set by st/nine, and then it's set for all
+      // shaders. So this can't change at runtime.
+      return mkOp2v(OP_ADD, TYPE_F32,
+                    insn->getDef(0), insn->getDef(0), loadImm(NULL, 0.5f));
+   } else {
+      return insn->getDef(0);
+   }
 }
 
 Value *

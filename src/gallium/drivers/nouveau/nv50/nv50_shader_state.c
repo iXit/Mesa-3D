@@ -116,7 +116,8 @@ nv50_program_validate(struct nv50_context *nv50, struct nv50_program *prog)
 {
    if (!prog->translated) {
       prog->translated = nv50_program_translate(
-         prog, nv50->screen->base.device->chipset, &nv50->base.debug);
+         prog, nv50->rast->pipe.half_pixel_center,
+         nv50->screen->base.device->chipset, &nv50->base.debug);
       if (!prog->translated)
          return false;
    } else

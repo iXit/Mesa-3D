@@ -547,7 +547,9 @@ nvc0_program_dump(struct nvc0_program *prog)
 #endif
 
 bool
-nvc0_program_translate(struct nvc0_program *prog, uint16_t chipset,
+nvc0_program_translate(struct nvc0_program *prog,
+                       bool half_pixel_center,
+                       uint16_t chipset,
                        struct pipe_debug_callback *debug)
 {
    struct nv50_ir_prog_info *info;
@@ -562,6 +564,7 @@ nvc0_program_translate(struct nvc0_program *prog, uint16_t chipset,
    info->bin.sourceRep = NV50_PROGRAM_IR_TGSI;
    info->bin.source = (void *)prog->pipe.tokens;
 
+   info->io.halfPixelCenter = half_pixel_center;
    info->io.genUserClip = prog->vp.num_ucps;
    info->io.auxCBSlot = 15;
    info->io.msInfoCBSlot = 15;

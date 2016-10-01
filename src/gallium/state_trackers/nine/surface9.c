@@ -191,7 +191,8 @@ NineSurface9_ctor( struct NineSurface9 *This,
         NineSurface9_SetLockable(This);
 
     /* TODO: investigate what else exactly needs to be cleared */
-    if (This->base.resource && (pDesc->Usage & D3DUSAGE_RENDERTARGET)) {
+    if (This->base.resource && (pDesc->Usage & D3DUSAGE_RENDERTARGET) &&
+        (pDesc->Format != D3DFMT_NULL)) {
         surf = NineSurface9_GetSurface(This, 0);
         pipe->clear_render_target(pipe, surf, &rgba, 0, 0, pDesc->Width, pDesc->Height, false);
     }

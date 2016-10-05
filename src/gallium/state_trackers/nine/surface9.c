@@ -441,9 +441,17 @@ NineSurface9_LockRect( struct NineSurface9 *This,
         usage |= PIPE_TRANSFER_DONTBLOCK;
 
     if (pRect) {
-        /* Windows XP accepts invalid locking rectangles, Windows 7 rejects
-         * them. Use Windows XP behaviour for now. */
-        rect_to_pipe_box(&box, pRect);
+        if (This->base.pool != D3DPOOL_DEFAULT) {
+            /* Windows XP accepts invalid locking rectangles, Windows 7 rejects
+             * them. Use Windows XP behaviour for now. */
+            rect_to_pipe_box(&box, pRect);
+        } else if (u_box_clip_2d(&box, &box, This->desc.Width,
+                                 This->desc.Height) < 0) {
+            /* Gallium drivers don't like invalid locking rectangles ! */
+            DBG("pRect clipped by Width=%u Height=%u\n",
+                This->desc.Width, This->desc.Height);
+            return D3DERR_INVALIDCALL;
+        }
     } else {
         u_box_origin_2d(This->desc.Width, This->desc.Height, &box);
     }

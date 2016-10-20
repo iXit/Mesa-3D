@@ -533,8 +533,6 @@ void
 NineDevice9_dtor( struct NineDevice9 *This )
 {
     unsigned i;
-    struct nine_range *r;
-    struct nine_range_pool *pool = &This->base.device->range_pool;
 
     DBG("This=%p\n", This);
 
@@ -581,23 +579,6 @@ NineDevice9_dtor( struct NineDevice9 *This )
 
     pipe_resource_reference(&This->cursor.image, NULL);
     FREE(This->cursor.hw_upload_temp);
-
-    if (This->state.changed.ps_const_f) {
-        for (r = This->state.changed.ps_const_f; r->next; r = r->next);
-        nine_range_pool_put_chain(pool, This->state.changed.ps_const_f, r);
-    }
-    if (This->state.changed.vs_const_f) {
-        for (r = This->state.changed.vs_const_f; r->next; r = r->next);
-        nine_range_pool_put_chain(pool, This->state.changed.vs_const_f, r);
-    }
-    if (This->state.changed.vs_const_i) {
-        for (r = This->state.changed.vs_const_i; r->next; r = r->next);
-        nine_range_pool_put_chain(pool, This->state.changed.vs_const_i, r);
-    }
-    if (This->state.changed.vs_const_b) {
-        for (r = This->state.changed.vs_const_b; r->next; r = r->next);
-        nine_range_pool_put_chain(pool, This->state.changed.vs_const_b, r);
-    }
 
     if (This->swapchains) {
         for (i = 0; i < This->nswapchains; ++i)

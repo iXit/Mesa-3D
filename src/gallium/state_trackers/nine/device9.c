@@ -3252,7 +3252,9 @@ NineDevice9_SetVertexShaderConstantF( struct NineDevice9 *This,
            pConstantData,
            Vector4fCount * 4 * sizeof(state->vs_const_f[0]));
 
-    nine_context_set_vertex_shader_constant_f(This, StartRegister, pConstantData, Vector4fCount);
+    nine_context_set_vertex_shader_constant_f(This, StartRegister, pConstantData,
+                                              Vector4fCount * 4 * sizeof(state->vs_const_f[0]),
+                                              Vector4fCount);
 
     return D3D_OK;
 }
@@ -3319,7 +3321,8 @@ NineDevice9_SetVertexShaderConstantI( struct NineDevice9 *This,
                            &This->range_pool);
         state->changed.group |= NINE_STATE_VS_CONST;
     } else
-        nine_context_set_vertex_shader_constant_i(This, StartRegister, pConstantData, Vector4iCount);
+        nine_context_set_vertex_shader_constant_i(This, StartRegister, pConstantData,
+                                                  Vector4iCount * sizeof(int[4]), Vector4iCount);
 
     return D3D_OK;
 }
@@ -3394,7 +3397,8 @@ NineDevice9_SetVertexShaderConstantB( struct NineDevice9 *This,
                            &This->range_pool);
         state->changed.group |= NINE_STATE_VS_CONST;
     } else
-        nine_context_set_vertex_shader_constant_b(This, StartRegister, pConstantData, BoolCount);
+        nine_context_set_vertex_shader_constant_b(This, StartRegister, pConstantData,
+                                                  sizeof(BOOL) * BoolCount, BoolCount);
 
     return D3D_OK;
 }
@@ -3659,7 +3663,9 @@ NineDevice9_SetPixelShaderConstantF( struct NineDevice9 *This,
            pConstantData,
            Vector4fCount * 4 * sizeof(state->ps_const_f[0]));
 
-    nine_context_set_pixel_shader_constant_f(This, StartRegister, pConstantData, Vector4fCount);
+    nine_context_set_pixel_shader_constant_f(This, StartRegister, pConstantData,
+                                             Vector4fCount * 4 * sizeof(state->ps_const_f[0]),
+                                             Vector4fCount);
 
     return D3D_OK;
 }
@@ -3722,7 +3728,8 @@ NineDevice9_SetPixelShaderConstantI( struct NineDevice9 *This,
         state->changed.ps_const_i |= ((1 << Vector4iCount) - 1) << StartRegister;
         state->changed.group |= NINE_STATE_PS_CONST;
     } else
-        nine_context_set_pixel_shader_constant_i(This, StartRegister, pConstantData, Vector4iCount);
+        nine_context_set_pixel_shader_constant_i(This, StartRegister, pConstantData,
+                                                 sizeof(state->ps_const_i[0]) * Vector4iCount, Vector4iCount);
 
     return D3D_OK;
 }
@@ -3791,7 +3798,8 @@ NineDevice9_SetPixelShaderConstantB( struct NineDevice9 *This,
         state->changed.ps_const_b |= ((1 << BoolCount) - 1) << StartRegister;
         state->changed.group |= NINE_STATE_PS_CONST;
     } else
-        nine_context_set_pixel_shader_constant_b(This, StartRegister, pConstantData, BoolCount);
+        nine_context_set_pixel_shader_constant_b(This, StartRegister, pConstantData,
+                                                 sizeof(BOOL) * BoolCount, BoolCount);
 
     return D3D_OK;
 }

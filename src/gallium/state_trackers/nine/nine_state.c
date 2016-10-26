@@ -1342,6 +1342,7 @@ void
 nine_context_set_vertex_shader_constant_f(struct NineDevice9 *device,
                                           UINT StartRegister,
                                           const float *pConstantData,
+                                          const unsigned pConstantData_size,
                                           UINT Vector4fCount)
 {
     struct nine_context *context = &device->context;
@@ -1349,7 +1350,7 @@ nine_context_set_vertex_shader_constant_f(struct NineDevice9 *device,
 
     memcpy(&vs_const_f[StartRegister * 4],
            pConstantData,
-           Vector4fCount * 4 * sizeof(context->vs_const_f[0]));
+           pConstantData_size);
 
     if (device->may_swvp) {
         Vector4fCount = MIN2(StartRegister + Vector4fCount, NINE_MAX_CONST_F) - StartRegister;
@@ -1368,6 +1369,7 @@ void
 nine_context_set_vertex_shader_constant_i(struct NineDevice9 *device,
                                           UINT StartRegister,
                                           const int *pConstantData,
+                                          const unsigned pConstantData_size,
                                           UINT Vector4iCount)
 {
     struct nine_context *context = &device->context;
@@ -1376,7 +1378,7 @@ nine_context_set_vertex_shader_constant_i(struct NineDevice9 *device,
     if (device->driver_caps.vs_integer) {
         memcpy(&context->vs_const_i[4 * StartRegister],
                pConstantData,
-               Vector4iCount * sizeof(int[4]));
+               pConstantData_size);
     } else {
         for (i = 0; i < Vector4iCount; i++) {
             context->vs_const_i[4 * (StartRegister + i)] = fui((float)(pConstantData[4 * i]));
@@ -1394,11 +1396,14 @@ void
 nine_context_set_vertex_shader_constant_b(struct NineDevice9 *device,
                                           UINT StartRegister,
                                           const BOOL *pConstantData,
+                                          const unsigned pConstantData_size,
                                           UINT BoolCount)
 {
     struct nine_context *context = &device->context;
     int i;
     uint32_t bool_true = device->driver_caps.vs_integer ? 0xFFFFFFFF : fui(1.0f);
+
+    (void) pConstantData_size;
 
     for (i = 0; i < BoolCount; i++)
         context->vs_const_b[StartRegister + i] = pConstantData[i] ? bool_true : 0;
@@ -1434,13 +1439,14 @@ void
 nine_context_set_pixel_shader_constant_f(struct NineDevice9 *device,
                                         UINT StartRegister,
                                         const float *pConstantData,
+                                        const unsigned pConstantData_size,
                                         UINT Vector4fCount)
 {
     struct nine_context *context = &device->context;
 
     memcpy(&context->ps_const_f[StartRegister * 4],
            pConstantData,
-           Vector4fCount * 4 * sizeof(context->ps_const_f[0]));
+           pConstantData_size);
 
     context->changed.ps_const_f = TRUE;
     context->changed.group |= NINE_STATE_PS_CONST;
@@ -1467,6 +1473,7 @@ void
 nine_context_set_pixel_shader_constant_i(struct NineDevice9 *device,
                                          UINT StartRegister,
                                          const int *pConstantData,
+                                         const unsigned pConstantData_size,
                                          UINT Vector4iCount)
 {
     struct nine_context *context = &device->context;
@@ -1475,7 +1482,7 @@ nine_context_set_pixel_shader_constant_i(struct NineDevice9 *device,
     if (device->driver_caps.ps_integer) {
         memcpy(&context->ps_const_i[StartRegister][0],
                pConstantData,
-               Vector4iCount * sizeof(context->ps_const_i[0]));
+               pConstantData_size);
     } else {
         for (i = 0; i < Vector4iCount; i++) {
             context->ps_const_i[StartRegister+i][0] = fui((float)(pConstantData[4*i]));
@@ -1492,11 +1499,14 @@ void
 nine_context_set_pixel_shader_constant_b(struct NineDevice9 *device,
                                          UINT StartRegister,
                                          const BOOL *pConstantData,
+                                         const unsigned pConstantData_size,
                                          UINT BoolCount)
 {
     struct nine_context *context = &device->context;
     int i;
     uint32_t bool_true = device->driver_caps.ps_integer ? 0xFFFFFFFF : fui(1.0f);
+
+    (void) pConstantData_size;
 
     for (i = 0; i < BoolCount; i++)
         context->ps_const_b[StartRegister + i] = pConstantData[i] ? bool_true : 0;

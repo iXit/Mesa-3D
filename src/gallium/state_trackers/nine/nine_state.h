@@ -381,18 +381,21 @@ void
 nine_context_set_vertex_shader_constant_f(struct NineDevice9 *device,
                                           UINT StartRegister,
                                           const float *pConstantData,
+                                          const unsigned pConstantData_size,
                                           UINT Vector4fCount);
 
 void
 nine_context_set_vertex_shader_constant_i(struct NineDevice9 *device,
                                           UINT StartRegister,
                                           const int *pConstantData,
+                                          const unsigned pConstantData_size,
                                           UINT Vector4iCount);
 
 void
 nine_context_set_vertex_shader_constant_b(struct NineDevice9 *device,
                                           UINT StartRegister,
                                           const BOOL *pConstantData,
+                                          const unsigned pConstantData_size,
                                           UINT BoolCount);
 
 void
@@ -403,18 +406,21 @@ void
 nine_context_set_pixel_shader_constant_f(struct NineDevice9 *device,
                                         UINT StartRegister,
                                         const float *pConstantData,
+                                        const unsigned pConstantData_size,
                                         UINT Vector4fCount);
 
 void
 nine_context_set_pixel_shader_constant_i(struct NineDevice9 *device,
                                          UINT StartRegister,
                                          const int *pConstantData,
+                                         const unsigned pConstantData_size,
                                          UINT Vector4iCount);
 
 void
 nine_context_set_pixel_shader_constant_b(struct NineDevice9 *device,
                                          UINT StartRegister,
                                          const BOOL *pConstantData,
+                                         const unsigned pConstantData_size,
                                          UINT BoolCount);
 
 void

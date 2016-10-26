@@ -468,7 +468,7 @@ nine_context_set_depth_stencil(struct NineDevice9 *device,
 void
 nine_context_set_clip_plane(struct NineDevice9 *device,
                             DWORD Index,
-                            struct nine_clipplane *pPlane);
+                            const struct nine_clipplane *pPlane);
 
 void
 nine_context_set_swvp(struct NineDevice9 *device,
@@ -560,5 +560,23 @@ nine_state_light_enable(struct nine_ff_state *, uint32_t *,
                         DWORD, BOOL);
 
 const char *nine_d3drs_to_string(DWORD State);
+
+/* CSMT functions */
+struct csmt_context;
+
+struct csmt_context *
+nine_csmt_create( struct NineDevice9 *This );
+
+void
+nine_csmt_destroy( struct NineDevice9 *This, struct csmt_context *ctx );
+
+void
+nine_csmt_process( struct NineDevice9 *This );
+
+struct pipe_context *
+nine_csmt_get_pipe( struct NineDevice9 *device );
+
+struct pipe_context *
+nine_csmt_get_pipe_save( struct NineDevice9 *device );
 
 #endif /* _NINE_STATE_H_ */

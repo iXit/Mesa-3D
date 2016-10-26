@@ -265,6 +265,18 @@ NineDevice9_ctor( struct NineDevice9 *This,
         nine_bind(&This->context.rt[i], This->state.rt[i]);
     }
 
+    /* Initialize CSMT */
+    This->csmt_active = getenv("D3D_DISABLE_CSMT") ? !atoi(getenv("D3D_DISABLE_CSMT")) : 1;
+
+    if (This->csmt_active) {
+        This->csmt_ctx = nine_csmt_create(This);
+        if (!This->csmt_ctx)
+            return E_OUTOFMEMORY;
+    }
+
+    if (This->csmt_active)
+        ERR("\033[1;32mCSMT is active\033[0m\n");
+
     /* Initialize a dummy VBO to be used when a vertex declaration does not
      * specify all the inputs needed by vertex shader, on win default behavior
      * is to pass 0,0,0,0 to the shader */
@@ -446,8 +458,8 @@ NineDevice9_ctor( struct NineDevice9 *This,
 
     /* Allocate upload helper for drivers that suck (from st pov ;). */
 
-    This->driver_caps.user_vbufs = GET_PCAP(USER_VERTEX_BUFFERS);
-    This->driver_caps.user_ibufs = GET_PCAP(USER_INDEX_BUFFERS);
+    This->driver_caps.user_vbufs = GET_PCAP(USER_VERTEX_BUFFERS) && !This->csmt_active;
+    This->driver_caps.user_ibufs = GET_PCAP(USER_INDEX_BUFFERS) && !This->csmt_active;
     This->driver_caps.user_cbufs = GET_PCAP(USER_CONSTANT_BUFFERS);
     This->driver_caps.user_sw_vbufs = This->screen_sw->get_param(This->screen_sw, PIPE_CAP_USER_VERTEX_BUFFERS);
     This->driver_caps.user_sw_cbufs = This->screen_sw->get_param(This->screen_sw, PIPE_CAP_USER_CONSTANT_BUFFERS);
@@ -489,6 +501,8 @@ NineDevice9_ctor( struct NineDevice9 *This,
     nine_state_init_sw(This);
 
     ID3DPresentGroup_Release(This->present);
+    if (This->csmt_active)
+        nine_csmt_process(This);
 
     return D3D_OK;
 }
@@ -500,6 +514,13 @@ NineDevice9_dtor( struct NineDevice9 *This )
     unsigned i;
 
     DBG("This=%p\n", This);
+
+    /* Do not call nine_csmt_process here. The device is dead! */
+    if (This->csmt_active && This->csmt_ctx) {
+        nine_csmt_destroy(This, This->csmt_ctx);
+        This->csmt_active = FALSE;
+        This->csmt_ctx = NULL;
+    }
 
     nine_ff_fini(This);
     nine_state_destroy_sw(This);
@@ -566,7 +587,13 @@ NineDevice9_GetScreen( struct NineDevice9 *This )
 struct pipe_context *
 NineDevice9_GetPipe( struct NineDevice9 *This )
 {
-    return This->context.pipe;
+    return nine_csmt_get_pipe(This);
+}
+
+struct pipe_context *
+NineDevice9_GetPipeSave( struct NineDevice9 *This )
+{
+    return nine_csmt_get_pipe_save(This);
 }
 
 const D3DCAPS9 *

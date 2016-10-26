@@ -21,7 +21,10 @@
  * OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE
  * USE OR OTHER DEALINGS IN THE SOFTWARE. */
 
+#define NINE_STATE
+
 #include "device9.h"
+#include "swapchain9.h"
 #include "basetexture9.h"
 #include "buffer9.h"
 #include "indexbuffer9.h"
@@ -41,7 +44,203 @@
 #include "util/u_box.h"
 #include "util/u_simple_shaders.h"
 
+/* CSMT headers */
+#include "nine_queue.h"
+#include "nine_csmt_helper.h"
+#include "os/os_thread.h"
+
 #define DBG_CHANNEL DBG_DEVICE
+
+/* Nine CSMT */
+
+struct csmt_instruction {
+    int (* func)(struct NineDevice9 *This, struct csmt_instruction *instr);
+};
+
+struct csmt_context {
+    pipe_thread worker;
+    struct nine_queue_pool* pool;
+    BOOL terminate;
+    pipe_condvar event_processed;
+    pipe_mutex mutex_processed;
+    struct NineDevice9 *device;
+    BOOL processed;
+};
+
+/* Wait for instruction to be processed.
+ * Caller has to ensure that only one thread waits at time.
+ */
+static void
+nine_csmt_wait_processed(struct csmt_context *ctx)
+{
+    pipe_mutex_lock(ctx->mutex_processed);
+    while (!ctx->processed) {
+        pipe_condvar_wait(ctx->event_processed, ctx->mutex_processed);
+    }
+    pipe_mutex_unlock(ctx->mutex_processed);
+}
+
+/* CSMT worker thread */
+static
+PIPE_THREAD_ROUTINE(nine_csmt_worker, arg)
+{
+    struct csmt_context *ctx = arg;
+    struct csmt_instruction *instr;
+    DBG("CSMT worker spawned\n");
+
+    pipe_thread_setname("CSMT-Worker");
+
+    while (1) {
+        /* Get instruction. Blocks until something is in the queue. */
+        instr = (struct csmt_instruction *)nine_queue_get(ctx->pool);
+
+        /* Check here to prevent executing queued instruction. */
+        if (ctx->terminate) {
+            pipe_mutex_lock(ctx->mutex_processed);
+            ctx->processed = TRUE;
+            pipe_condvar_signal(ctx->event_processed);
+            pipe_mutex_unlock(ctx->mutex_processed);
+            break;
+        }
+
+        /* decode */
+        if (instr->func(ctx->device, instr)) {
+            pipe_mutex_lock(ctx->mutex_processed);
+            ctx->processed = TRUE;
+            pipe_condvar_signal(ctx->event_processed);
+            pipe_mutex_unlock(ctx->mutex_processed);
+        }
+    }
+
+    DBG("CSMT worker destroyed\n");
+    return 0;
+}
+
+/* Create a CSMT context.
+ * Spawns a worker thread.
+ */
+struct csmt_context *
+nine_csmt_create( struct NineDevice9 *This )
+{
+    struct csmt_context *ctx;
+
+    ctx = CALLOC_STRUCT(csmt_context);
+    if (!ctx)
+        return NULL;
+
+    ctx->pool = nine_queue_create();
+    if (!ctx->pool) {
+        FREE(ctx);
+        return NULL;
+    }
+    pipe_condvar_init(ctx->event_processed);
+    pipe_mutex_init(ctx->mutex_processed);
+
+#if DEBUG
+    pipe_thread_setname("Main thread");
+#endif
+
+    ctx->device = This;
+
+    ctx->worker = pipe_thread_create(nine_csmt_worker, ctx);
+    if (!ctx->worker) {
+        nine_queue_delete(ctx->pool);
+        FREE(ctx);
+        return NULL;
+    }
+
+    DBG("Returning context %p\n", ctx);
+
+    return ctx;
+}
+
+static int
+nop_func( struct NineDevice9 *This, struct csmt_instruction *instr )
+{
+    struct csmt_context *ctx = This->csmt_ctx;
+    (void) instr;
+
+    nine_queue_pop(ctx->pool, sizeof(struct csmt_instruction));
+
+    return 1;
+}
+
+/* Push nop instruction and flush the queue.
+ * Waits for the worker to complete. */
+void
+nine_csmt_process( struct NineDevice9 *device )
+{
+    struct csmt_instruction* instr;
+    struct csmt_context *ctx = device->csmt_ctx;
+
+    if (!device->csmt_active)
+        return;
+
+    DBG("device=%p\n", device);
+
+    /* NOP */
+    instr = nine_queue_alloc(ctx->pool, sizeof(struct csmt_instruction));
+    assert(instr);
+    instr->func = nop_func;
+
+    ctx->processed = FALSE;
+    nine_queue_push(ctx->pool, sizeof(struct csmt_instruction), TRUE);
+
+    nine_csmt_wait_processed(ctx);
+}
+
+/* Destroys a CSMT context.
+ * Waits for the worker thread to terminate.
+ */
+void
+nine_csmt_destroy( struct NineDevice9 *device, struct csmt_context *ctx )
+{
+    struct csmt_instruction* instr;
+    pipe_thread render_thread = ctx->worker;
+
+    DBG("device=%p ctx=%p\n", device, ctx);
+
+    /* Push nop and flush the queue. */
+    instr = nine_queue_alloc(ctx->pool, sizeof(struct csmt_instruction));
+    assert(instr);
+    instr->func = nop_func;
+
+    /* Signal worker to terminate. */
+    ctx->terminate = TRUE;
+
+    nine_queue_push(ctx->pool, sizeof(struct csmt_instruction), TRUE);
+
+    nine_csmt_wait_processed(ctx);
+    nine_queue_delete(ctx->pool);
+    pipe_mutex_destroy(ctx->mutex_processed);
+
+    FREE(ctx);
+
+    pipe_thread_wait(render_thread);
+}
+
+struct pipe_context *
+nine_csmt_get_pipe( struct NineDevice9 *device )
+{
+    if (device->csmt_active)
+        nine_csmt_process(device);
+    return device->context.pipe;
+}
+
+struct pipe_context *
+nine_csmt_get_pipe_save( struct NineDevice9 *device )
+{
+    struct csmt_context *ctx = device->csmt_ctx;
+
+    if (!device->csmt_active)
+        return device->context.pipe;
+
+    if (!ctx || !pipe_thread_is_self(ctx->worker))
+        nine_csmt_process(device);
+
+    return device->context.pipe;
+}
+/* Nine state functions */
 
 /* Check if some states need to be set dirty */
 
@@ -1094,11 +1293,44 @@ NineDevice9_ResolveZ( struct NineDevice9 *device )
 #define ALPHA_TO_COVERAGE_ENABLE   MAKEFOURCC('A', '2', 'M', '1')
 #define ALPHA_TO_COVERAGE_DISABLE  MAKEFOURCC('A', '2', 'M', '0')
 
+/* Nine_context functions.
+ * Serialized through CSMT macros.
+ */
 
-void
-nine_context_set_render_state(struct NineDevice9 *device,
-                              D3DRENDERSTATETYPE State,
-                              DWORD Value)
+static void
+nine_context_set_texture_apply(struct NineDevice9 *device,
+                               DWORD stage,
+                               BOOL enabled,
+                               BOOL shadow,
+                               DWORD lod,
+                               D3DRESOURCETYPE type,
+                               uint8_t pstype,
+                               struct pipe_resource *res,
+                               struct pipe_sampler_view *view0,
+                               struct pipe_sampler_view *view1);
+static void
+nine_context_set_stream_source_apply(struct NineDevice9 *device,
+                                    UINT StreamNumber,
+                                    struct pipe_resource *res,
+                                    UINT OffsetInBytes,
+                                    UINT Stride);
+
+static void
+nine_context_set_indices_apply(struct NineDevice9 *device,
+                               struct pipe_resource *res,
+                               UINT IndexSize,
+                               UINT OffsetInBytes);
+
+static void
+nine_context_set_pixel_shader_constant_i_transformed(struct NineDevice9 *device,
+                                                     UINT StartRegister,
+                                                     const int *pConstantData,
+                                                     unsigned pConstantData_size,
+                                                     UINT Vector4iCount);
+
+CSMT_ITEM_NO_WAIT(nine_context_set_render_state,
+                  ARG_VAL(D3DRENDERSTATETYPE, State),
+                  ARG_VAL(DWORD, Value))
 {
     struct nine_context *context = &device->context;
 
@@ -1137,17 +1369,16 @@ nine_context_set_render_state(struct NineDevice9 *device,
     context->changed.group |= nine_render_state_group[State];
 }
 
-static void
-nine_context_set_texture_apply(struct NineDevice9 *device,
-                               DWORD stage,
-                               BOOL enabled,
-                               BOOL shadow,
-                               DWORD lod,
-                               D3DRESOURCETYPE type,
-                               uint8_t pstype,
-                               struct pipe_resource *res,
-                               struct pipe_sampler_view *view0,
-                               struct pipe_sampler_view *view1)
+CSMT_ITEM_NO_WAIT(nine_context_set_texture_apply,
+                  ARG_VAL(DWORD, stage),
+                  ARG_VAL(BOOL, enabled),
+                  ARG_VAL(BOOL, shadow),
+                  ARG_VAL(DWORD, lod),
+                  ARG_VAL(D3DRESOURCETYPE, type),
+                  ARG_VAL(uint8_t, pstype),
+                  ARG_BIND_RES(struct pipe_resource, res),
+                  ARG_BIND_VIEW(struct pipe_sampler_view, view0),
+                  ARG_BIND_VIEW(struct pipe_sampler_view, view1))
 {
     struct nine_context *context = &device->context;
 
@@ -1197,11 +1428,10 @@ nine_context_set_texture(struct NineDevice9 *device,
                                    res, view0, view1);
 }
 
-void
-nine_context_set_sampler_state(struct NineDevice9 *device,
-                               DWORD Sampler,
-                               D3DSAMPLERSTATETYPE Type,
-                               DWORD Value)
+CSMT_ITEM_NO_WAIT(nine_context_set_sampler_state,
+                  ARG_VAL(DWORD, Sampler),
+                  ARG_VAL(D3DSAMPLERSTATETYPE, Type),
+                  ARG_VAL(DWORD, Value))
 {
     struct nine_context *context = &device->context;
 
@@ -1213,12 +1443,11 @@ nine_context_set_sampler_state(struct NineDevice9 *device,
     context->changed.sampler[Sampler] |= 1 << Type;
 }
 
-static void
-nine_context_set_stream_source_apply(struct NineDevice9 *device,
-                                    UINT StreamNumber,
-                                    struct pipe_resource *res,
-                                    UINT OffsetInBytes,
-                                    UINT Stride)
+CSMT_ITEM_NO_WAIT(nine_context_set_stream_source_apply,
+                  ARG_VAL(UINT, StreamNumber),
+                  ARG_BIND_RES(struct pipe_resource, res),
+                  ARG_VAL(UINT, OffsetInBytes),
+                  ARG_VAL(UINT, Stride))
 {
     struct nine_context *context = &device->context;
     const unsigned i = StreamNumber;
@@ -1249,10 +1478,9 @@ nine_context_set_stream_source(struct NineDevice9 *device,
                                          Stride);
 }
 
-void
-nine_context_set_stream_source_freq(struct NineDevice9 *device,
-                                    UINT StreamNumber,
-                                    UINT Setting)
+CSMT_ITEM_NO_WAIT(nine_context_set_stream_source_freq,
+                  ARG_VAL(UINT, StreamNumber),
+                  ARG_VAL(UINT, Setting))
 {
     struct nine_context *context = &device->context;
 
@@ -1267,11 +1495,10 @@ nine_context_set_stream_source_freq(struct NineDevice9 *device,
         context->changed.group |= NINE_STATE_STREAMFREQ;
 }
 
-static void
-nine_context_set_indices_apply(struct NineDevice9 *device,
-                               struct pipe_resource *res,
-                               UINT IndexSize,
-                               UINT OffsetInBytes)
+CSMT_ITEM_NO_WAIT(nine_context_set_indices_apply,
+                  ARG_BIND_RES(struct pipe_resource, res),
+                  ARG_VAL(UINT, IndexSize),
+                  ARG_VAL(UINT, OffsetInBytes))
 {
     struct nine_context *context = &device->context;
 
@@ -1302,9 +1529,8 @@ nine_context_set_indices(struct NineDevice9 *device,
     nine_context_set_indices_apply(device, res, IndexSize, OffsetInBytes);
 }
 
-void
-nine_context_set_vertex_declaration(struct NineDevice9 *device,
-                                    struct NineVertexDeclaration9 *vdecl)
+CSMT_ITEM_NO_WAIT(nine_context_set_vertex_declaration,
+                  ARG_BIND_REF(struct NineVertexDeclaration9, vdecl))
 {
     struct nine_context *context = &device->context;
     BOOL was_programmable_vs = context->programmable_vs;
@@ -1320,9 +1546,8 @@ nine_context_set_vertex_declaration(struct NineDevice9 *device,
     context->changed.group |= NINE_STATE_VDECL;
 }
 
-void
-nine_context_set_vertex_shader(struct NineDevice9 *device,
-                               struct NineVertexShader9 *pShader)
+CSMT_ITEM_NO_WAIT(nine_context_set_vertex_shader,
+                  ARG_BIND_REF(struct NineVertexShader9, pShader))
 {
     struct nine_context *context = &device->context;
     BOOL was_programmable_vs = context->programmable_vs;
@@ -1338,12 +1563,11 @@ nine_context_set_vertex_shader(struct NineDevice9 *device,
     context->changed.group |= NINE_STATE_VS;
 }
 
-void
-nine_context_set_vertex_shader_constant_f(struct NineDevice9 *device,
-                                          UINT StartRegister,
-                                          const float *pConstantData,
-                                          const unsigned pConstantData_size,
-                                          UINT Vector4fCount)
+CSMT_ITEM_NO_WAIT(nine_context_set_vertex_shader_constant_f,
+                  ARG_VAL(UINT, StartRegister),
+                  ARG_MEM(float, pConstantData),
+                  ARG_MEM_SIZE(unsigned, pConstantData_size),
+                  ARG_VAL(UINT, Vector4fCount))
 {
     struct nine_context *context = &device->context;
     float *vs_const_f = device->may_swvp ? context->vs_const_f_swvp : context->vs_const_f;
@@ -1364,13 +1588,11 @@ nine_context_set_vertex_shader_constant_f(struct NineDevice9 *device,
     context->changed.group |= NINE_STATE_VS_CONST;
 }
 
-
-void
-nine_context_set_vertex_shader_constant_i(struct NineDevice9 *device,
-                                          UINT StartRegister,
-                                          const int *pConstantData,
-                                          const unsigned pConstantData_size,
-                                          UINT Vector4iCount)
+CSMT_ITEM_NO_WAIT(nine_context_set_vertex_shader_constant_i,
+                  ARG_VAL(UINT, StartRegister),
+                  ARG_MEM(int, pConstantData),
+                  ARG_MEM_SIZE(unsigned, pConstantData_size),
+                  ARG_VAL(UINT, Vector4iCount))
 {
     struct nine_context *context = &device->context;
     int i;
@@ -1392,12 +1614,11 @@ nine_context_set_vertex_shader_constant_i(struct NineDevice9 *device,
     context->changed.group |= NINE_STATE_VS_CONST;
 }
 
-void
-nine_context_set_vertex_shader_constant_b(struct NineDevice9 *device,
-                                          UINT StartRegister,
-                                          const BOOL *pConstantData,
-                                          const unsigned pConstantData_size,
-                                          UINT BoolCount)
+CSMT_ITEM_NO_WAIT(nine_context_set_vertex_shader_constant_b,
+                  ARG_VAL(UINT, StartRegister),
+                  ARG_MEM(BOOL, pConstantData),
+                  ARG_MEM_SIZE(unsigned, pConstantData_size),
+                  ARG_VAL(UINT, BoolCount))
 {
     struct nine_context *context = &device->context;
     int i;
@@ -1412,9 +1633,8 @@ nine_context_set_vertex_shader_constant_b(struct NineDevice9 *device,
     context->changed.group |= NINE_STATE_VS_CONST;
 }
 
-void
-nine_context_set_pixel_shader(struct NineDevice9 *device,
-                              struct NinePixelShader9* ps)
+CSMT_ITEM_NO_WAIT(nine_context_set_pixel_shader,
+                  ARG_BIND_REF(struct NinePixelShader9, ps))
 {
     struct nine_context *context = &device->context;
     unsigned old_mask = context->ps ? context->ps->rt_mask : 1;
@@ -1435,12 +1655,11 @@ nine_context_set_pixel_shader(struct NineDevice9 *device,
         context->changed.group |= NINE_STATE_FB;
 }
 
-void
-nine_context_set_pixel_shader_constant_f(struct NineDevice9 *device,
-                                        UINT StartRegister,
-                                        const float *pConstantData,
-                                        const unsigned pConstantData_size,
-                                        UINT Vector4fCount)
+CSMT_ITEM_NO_WAIT(nine_context_set_pixel_shader_constant_f,
+                  ARG_VAL(UINT, StartRegister),
+                  ARG_MEM(float, pConstantData),
+                  ARG_MEM_SIZE(unsigned, pConstantData_size),
+                  ARG_VAL(UINT, Vector4fCount))
 {
     struct nine_context *context = &device->context;
 
@@ -1453,11 +1672,11 @@ nine_context_set_pixel_shader_constant_f(struct NineDevice9 *device,
 }
 
 /* For stateblocks */
-static void
-nine_context_set_pixel_shader_constant_i_transformed(struct NineDevice9 *device,
-                                                     UINT StartRegister,
-                                                     const int *pConstantData,
-                                                     UINT Vector4iCount)
+CSMT_ITEM_NO_WAIT(nine_context_set_pixel_shader_constant_i_transformed,
+                  ARG_VAL(UINT, StartRegister),
+                  ARG_MEM(int, pConstantData),
+                  ARG_MEM_SIZE(unsigned, pConstantData_size),
+                  ARG_VAL(UINT, Vector4iCount))
 {
     struct nine_context *context = &device->context;
 
@@ -1469,12 +1688,11 @@ nine_context_set_pixel_shader_constant_i_transformed(struct NineDevice9 *device,
     context->changed.group |= NINE_STATE_PS_CONST;
 }
 
-void
-nine_context_set_pixel_shader_constant_i(struct NineDevice9 *device,
-                                         UINT StartRegister,
-                                         const int *pConstantData,
-                                         const unsigned pConstantData_size,
-                                         UINT Vector4iCount)
+CSMT_ITEM_NO_WAIT(nine_context_set_pixel_shader_constant_i,
+                  ARG_VAL(UINT, StartRegister),
+                  ARG_MEM(int, pConstantData),
+                  ARG_MEM_SIZE(unsigned, pConstantData_size),
+                  ARG_VAL(UINT, Vector4iCount))
 {
     struct nine_context *context = &device->context;
     int i;
@@ -1495,12 +1713,11 @@ nine_context_set_pixel_shader_constant_i(struct NineDevice9 *device,
     context->changed.group |= NINE_STATE_PS_CONST;
 }
 
-void
-nine_context_set_pixel_shader_constant_b(struct NineDevice9 *device,
-                                         UINT StartRegister,
-                                         const BOOL *pConstantData,
-                                         const unsigned pConstantData_size,
-                                         UINT BoolCount)
+CSMT_ITEM_NO_WAIT(nine_context_set_pixel_shader_constant_b,
+                  ARG_VAL(UINT, StartRegister),
+                  ARG_MEM(BOOL, pConstantData),
+                  ARG_MEM_SIZE(unsigned, pConstantData_size),
+                  ARG_VAL(UINT, BoolCount))
 {
     struct nine_context *context = &device->context;
     int i;
@@ -1515,10 +1732,10 @@ nine_context_set_pixel_shader_constant_b(struct NineDevice9 *device,
     context->changed.group |= NINE_STATE_PS_CONST;
 }
 
-void
-nine_context_set_render_target(struct NineDevice9 *device,
-                               DWORD RenderTargetIndex,
-                               struct NineSurface9 *rt)
+//XXX: use resource, as resource might change
+CSMT_ITEM_NO_WAIT(nine_context_set_render_target,
+                  ARG_VAL(DWORD, RenderTargetIndex),
+                  ARG_BIND_REF(struct NineSurface9, rt))
 {
     struct nine_context *context = &device->context;
     const unsigned i = RenderTargetIndex;
@@ -1550,9 +1767,9 @@ nine_context_set_render_target(struct NineDevice9 *device,
     }
 }
 
-void
-nine_context_set_depth_stencil(struct NineDevice9 *device,
-                               struct NineSurface9 *ds)
+//XXX: use resource instead of ds, as resource might change
+CSMT_ITEM_NO_WAIT(nine_context_set_depth_stencil,
+                  ARG_BIND_REF(struct NineSurface9, ds))
 {
     struct nine_context *context = &device->context;
 
@@ -1560,9 +1777,8 @@ nine_context_set_depth_stencil(struct NineDevice9 *device,
     context->changed.group |= NINE_STATE_FB;
 }
 
-void
-nine_context_set_viewport(struct NineDevice9 *device,
-                          const D3DVIEWPORT9 *viewport)
+CSMT_ITEM_NO_WAIT(nine_context_set_viewport,
+                  ARG_COPY_REF(D3DVIEWPORT9, viewport))
 {
     struct nine_context *context = &device->context;
 
@@ -1570,9 +1786,8 @@ nine_context_set_viewport(struct NineDevice9 *device,
     context->changed.group |= NINE_STATE_VIEWPORT;
 }
 
-void
-nine_context_set_scissor(struct NineDevice9 *device,
-                         const struct pipe_scissor_state *scissor)
+CSMT_ITEM_NO_WAIT(nine_context_set_scissor,
+                  ARG_COPY_REF(struct pipe_scissor_state, scissor))
 {
     struct nine_context *context = &device->context;
 
@@ -1580,10 +1795,9 @@ nine_context_set_scissor(struct NineDevice9 *device,
     context->changed.group |= NINE_STATE_SCISSOR;
 }
 
-void
-nine_context_set_transform(struct NineDevice9 *device,
-                           D3DTRANSFORMSTATETYPE State,
-                           const D3DMATRIX *pMatrix)
+CSMT_ITEM_NO_WAIT(nine_context_set_transform,
+                  ARG_VAL(D3DTRANSFORMSTATETYPE, State),
+                  ARG_COPY_REF(D3DMATRIX, pMatrix))
 {
     struct nine_context *context = &device->context;
     D3DMATRIX *M = nine_state_access_transform(&context->ff, State, TRUE);
@@ -1593,9 +1807,8 @@ nine_context_set_transform(struct NineDevice9 *device,
     context->changed.group |= NINE_STATE_FF;
 }
 
-void
-nine_context_set_material(struct NineDevice9 *device,
-                          const D3DMATERIAL9 *pMaterial)
+CSMT_ITEM_NO_WAIT(nine_context_set_material,
+                  ARG_COPY_REF(D3DMATERIAL9, pMaterial))
 {
     struct nine_context *context = &device->context;
 
@@ -1603,10 +1816,9 @@ nine_context_set_material(struct NineDevice9 *device,
     context->changed.group |= NINE_STATE_FF_MATERIAL;
 }
 
-void
-nine_context_set_light(struct NineDevice9 *device,
-                       DWORD Index,
-                       const D3DLIGHT9 *pLight)
+CSMT_ITEM_NO_WAIT(nine_context_set_light,
+                  ARG_VAL(DWORD, Index),
+                  ARG_COPY_REF(D3DLIGHT9, pLight))
 {
     struct nine_context *context = &device->context;
 
@@ -1623,25 +1835,25 @@ nine_context_light_enable_stateblock(struct NineDevice9 *device,
 {
     struct nine_context *context = &device->context;
 
+    if (device->csmt_active) /* TODO: fix */
+        nine_csmt_process(device);
     memcpy(&context->ff.active_light, &active_light, NINE_MAX_LIGHTS_ACTIVE * sizeof(context->ff.active_light[0]));
     context->ff.num_lights_active = num_lights_active;
 }
 
-void
-nine_context_light_enable(struct NineDevice9 *device,
-                          DWORD Index,
-                          BOOL Enable)
+CSMT_ITEM_NO_WAIT(nine_context_light_enable,
+                  ARG_VAL(DWORD, Index),
+                  ARG_VAL(BOOL, Enable))
 {
     struct nine_context *context = &device->context;
 
     nine_state_light_enable(&context->ff, &context->changed.group, Index, Enable);
 }
 
-void
-nine_context_set_texture_stage_state(struct NineDevice9 *device,
-                                     DWORD Stage,
-                                     D3DTEXTURESTAGESTATETYPE Type,
-                                     DWORD Value)
+CSMT_ITEM_NO_WAIT(nine_context_set_texture_stage_state,
+                  ARG_VAL(DWORD, Stage),
+                  ARG_VAL(D3DTEXTURESTAGESTATETYPE, Type),
+                  ARG_VAL(DWORD, Value))
 {
     struct nine_context *context = &device->context;
     int bumpmap_index = -1;
@@ -1682,10 +1894,9 @@ nine_context_set_texture_stage_state(struct NineDevice9 *device,
     context->ff.changed.tex_stage[Stage][Type / 32] |= 1 << (Type % 32);
 }
 
-void
-nine_context_set_clip_plane(struct NineDevice9 *device,
-                            DWORD Index,
-                            struct nine_clipplane *pPlane)
+CSMT_ITEM_NO_WAIT(nine_context_set_clip_plane,
+                  ARG_VAL(DWORD, Index),
+                  ARG_COPY_REF(struct nine_clipplane, pPlane))
 {
     struct nine_context *context = &device->context;
 
@@ -1693,9 +1904,8 @@ nine_context_set_clip_plane(struct NineDevice9 *device,
     context->changed.ucp = TRUE;
 }
 
-void
-nine_context_set_swvp(struct NineDevice9 *device,
-                      boolean swvp)
+CSMT_ITEM_NO_WAIT(nine_context_set_swvp,
+                  ARG_VAL(boolean, swvp))
 {
     struct nine_context *context = &device->context;
 
@@ -2015,14 +2225,17 @@ nine_context_apply_stateblock(struct NineDevice9 *device,
         for (r = src->changed.vs_const_f; r; r = r->next)
             nine_context_set_vertex_shader_constant_f(device, r->bgn,
                                                       &src->vs_const_f[r->bgn * 4],
+                                                      sizeof(float[4]) * (r->end - r->bgn),
                                                       r->end - r->bgn);
         for (r = src->changed.vs_const_i; r; r = r->next)
             nine_context_set_vertex_shader_constant_i(device, r->bgn,
                                                       &src->vs_const_i[r->bgn * 4],
+                                                      sizeof(int[4]) * (r->end - r->bgn),
                                                       r->end - r->bgn);
         for (r = src->changed.vs_const_b; r; r = r->next)
             nine_context_set_vertex_shader_constant_b(device, r->bgn,
                                                       &src->vs_const_b[r->bgn * 4],
+                                                      sizeof(BOOL) * (r->end - r->bgn),
                                                       r->end - r->bgn);
     }
 
@@ -2032,20 +2245,21 @@ nine_context_apply_stateblock(struct NineDevice9 *device,
         for (r = src->changed.ps_const_f; r; r = r->next)
             nine_context_set_pixel_shader_constant_f(device, r->bgn,
                                                      &src->ps_const_f[r->bgn * 4],
+                                                     sizeof(float[4]) * (r->end - r->bgn),
                                                      r->end - r->bgn);
         if (src->changed.ps_const_i) {
             uint16_t m = src->changed.ps_const_i;
             for (i = ffs(m) - 1, m >>= i; m; ++i, m >>= 1)
                 if (m & 1)
                     nine_context_set_pixel_shader_constant_i_transformed(device, i,
-                                                                         src->ps_const_i[i], 1);
+                                                                         src->ps_const_i[i], sizeof(int[4]), 1);
         }
         if (src->changed.ps_const_b) {
             uint16_t m = src->changed.ps_const_b;
             for (i = ffs(m) - 1, m >>= i; m; ++i, m >>= 1)
                 if (m & 1)
                     nine_context_set_pixel_shader_constant_b(device, i,
-                                                             &src->ps_const_b[i], 1);
+                                                             &src->ps_const_b[i], sizeof(BOOL), 1);
         }
     }
 
@@ -2112,15 +2326,16 @@ nine_update_state_framebuffer_clear(struct NineDevice9 *device)
         update_framebuffer(device, TRUE);
 }
 
-/* Checks were already done before the call */
-void
-nine_context_clear_fb(struct NineDevice9 *device,
-              DWORD Count,
-              const D3DRECT *pRects,
-              DWORD Flags,
-              D3DCOLOR Color,
-              float Z,
-              DWORD Stencil)
+/* FIXME: Move checks into this function
+ * XXX: Checks were already done before the call */
+
+CSMT_ITEM_NO_WAIT(nine_context_clear_fb,
+                  ARG_VAL(DWORD, Count),
+                  ARG_COPY_REF(D3DRECT, pRects),
+                  ARG_VAL(DWORD, Flags),
+                  ARG_VAL(D3DCOLOR, Color),
+                  ARG_VAL(float, Z),
+                  ARG_VAL(DWORD, Stencil))
 {
     struct nine_context *context = &device->context;
     const int sRGB = context->rs[D3DRS_SRGBWRITEENABLE] ? 1 : 0;
@@ -2275,11 +2490,10 @@ init_draw_info(struct pipe_draw_info *info,
     info->indirect_params = NULL;
 }
 
-void
-nine_context_draw_primitive(struct NineDevice9 *device,
-                            D3DPRIMITIVETYPE PrimitiveType,
-                            UINT StartVertex,
-                            UINT PrimitiveCount)
+CSMT_ITEM_NO_WAIT(nine_context_draw_primitive,
+                  ARG_VAL(D3DPRIMITIVETYPE, PrimitiveType),
+                  ARG_VAL(UINT, StartVertex),
+                  ARG_VAL(UINT, PrimitiveCount))
 {
     struct nine_context *context = &device->context;
     struct pipe_draw_info info;
@@ -2296,14 +2510,13 @@ nine_context_draw_primitive(struct NineDevice9 *device,
     context->pipe->draw_vbo(context->pipe, &info);
 }
 
-void
-nine_context_draw_indexed_primitive(struct NineDevice9 *device,
-                                    D3DPRIMITIVETYPE PrimitiveType,
-                                    INT BaseVertexIndex,
-                                    UINT MinVertexIndex,
-                                    UINT NumVertices,
-                                    UINT StartIndex,
-                                    UINT PrimitiveCount)
+CSMT_ITEM_NO_WAIT(nine_context_draw_indexed_primitive,
+                  ARG_VAL(D3DPRIMITIVETYPE, PrimitiveType),
+                   ARG_VAL(INT, BaseVertexIndex),
+                   ARG_VAL(UINT, MinVertexIndex),
+                   ARG_VAL(UINT, NumVertices),
+                   ARG_VAL(UINT, StartIndex),
+                   ARG_VAL(UINT, PrimitiveCount))
 {
     struct nine_context *context = &device->context;
     struct pipe_draw_info info;
@@ -2321,11 +2534,10 @@ nine_context_draw_indexed_primitive(struct NineDevice9 *device,
     context->pipe->draw_vbo(context->pipe, &info);
 }
 
-void
-nine_context_draw_primitive_from_vtxbuf(struct NineDevice9 *device,
-                                        D3DPRIMITIVETYPE PrimitiveType,
-                                        UINT PrimitiveCount,
-                                        struct pipe_vertex_buffer *vtxbuf)
+CSMT_ITEM_NO_WAIT(nine_context_draw_primitive_from_vtxbuf,
+                  ARG_VAL(D3DPRIMITIVETYPE, PrimitiveType),
+                  ARG_VAL(UINT, PrimitiveCount),
+                  ARG_BIND_BUF(struct pipe_vertex_buffer, vtxbuf))
 {
     struct nine_context *context = &device->context;
     struct pipe_draw_info info;
@@ -2346,14 +2558,13 @@ nine_context_draw_primitive_from_vtxbuf(struct NineDevice9 *device,
     pipe_resource_reference(&vtxbuf->buffer, NULL);
 }
 
-void
-nine_context_draw_indexed_primitive_from_vtxbuf_idxbuf(struct NineDevice9 *device,
-                                                       D3DPRIMITIVETYPE PrimitiveType,
-                                                       UINT MinVertexIndex,
-                                                       UINT NumVertices,
-                                                       UINT PrimitiveCount,
-                                                       struct pipe_vertex_buffer *vbuf,
-                                                       struct pipe_index_buffer *ibuf)
+CSMT_ITEM_NO_WAIT(nine_context_draw_indexed_primitive_from_vtxbuf_idxbuf,
+                  ARG_VAL(D3DPRIMITIVETYPE, PrimitiveType),
+                  ARG_VAL(UINT, MinVertexIndex),
+                  ARG_VAL(UINT, NumVertices),
+                  ARG_VAL(UINT, PrimitiveCount),
+                  ARG_BIND_BUF(struct pipe_vertex_buffer, vbuf),
+                  ARG_BIND_BUF(struct pipe_index_buffer, ibuf))
 {
     struct nine_context *context = &device->context;
     struct pipe_draw_info info;
@@ -2380,27 +2591,31 @@ nine_context_create_query(struct NineDevice9 *device, unsigned query_type)
 {
     struct nine_context *context = &device->context;
 
+    if (device->csmt_active)
+        nine_csmt_process(device);
     return context->pipe->create_query(context->pipe, query_type, 0);
 }
 
-void
-nine_context_destroy_query(struct NineDevice9 *device, struct pipe_query *query)
+CSMT_ITEM_DO_WAIT(nine_context_destroy_query,
+                  ARG_REF(struct pipe_query, query))
 {
     struct nine_context *context = &device->context;
 
     context->pipe->destroy_query(context->pipe, query);
 }
 
-void
-nine_context_begin_query(struct NineDevice9 *device, struct pipe_query *query)
+//XXX: use non blocking csmt functions. bind pipe_query ???
+CSMT_ITEM_DO_WAIT(nine_context_begin_query,
+                  ARG_REF(struct pipe_query, query))
 {
     struct nine_context *context = &device->context;
 
     (void) context->pipe->begin_query(context->pipe, query);
 }
 
-void
-nine_context_end_query(struct NineDevice9 *device, struct pipe_query *query)
+//XXX: use non blocking csmt functions. bind pipe_query ???
+CSMT_ITEM_DO_WAIT(nine_context_end_query,
+                  ARG_REF(struct pipe_query, query))
 {
     struct nine_context *context = &device->context;
 
@@ -2415,6 +2630,8 @@ nine_context_get_query_result(struct NineDevice9 *device, struct pipe_query *que
     struct nine_context *context = &device->context;
 
     (void) flush;
+    if (device->csmt_active)
+        nine_csmt_process(device);
     return context->pipe->get_query_result(context->pipe, query, wait, result);
 }
 

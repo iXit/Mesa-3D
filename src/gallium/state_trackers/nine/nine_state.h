@@ -529,6 +529,9 @@ boolean
 nine_context_get_query_result(struct NineDevice9 *device, struct pipe_query *query,
                               boolean flush, boolean wait,
                               union pipe_query_result *result);
+void
+nine_context_blit(struct NineDevice9 *device,
+                  struct pipe_blit_info *blit);
 
 void nine_state_restore_non_cso(struct NineDevice9 *device);
 void nine_state_set_defaults(struct NineDevice9 *, const D3DCAPS9 *,

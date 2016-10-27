@@ -2586,6 +2586,14 @@ CSMT_ITEM_NO_WAIT(nine_context_draw_indexed_primitive_from_vtxbuf_idxbuf,
     pipe_resource_reference(&ibuf->buffer, NULL);
 }
 
+CSMT_ITEM_NO_WAIT(nine_context_blit,
+                  ARG_BIND_BLIT(struct pipe_blit_info, blit))
+{
+    struct nine_context *context = &device->context;
+
+    context->pipe->blit(context->pipe, blit);
+}
+
 struct pipe_query *
 nine_context_create_query(struct NineDevice9 *device, unsigned query_type)
 {

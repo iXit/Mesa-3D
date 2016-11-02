@@ -513,6 +513,15 @@ nine_context_draw_indexed_primitive_from_vtxbuf_idxbuf(struct NineDevice9 *devic
                                                        struct pipe_vertex_buffer *vbuf,
                                                        struct pipe_index_buffer *ibuf);
 
+void
+nine_context_resource_copy_region(struct NineDevice9 *device,
+                                  struct pipe_resource* dst_res,
+                                  unsigned dst_level,
+                                  const struct pipe_box *dst_box,
+                                  struct pipe_resource* src_res,
+                                  unsigned src_level,
+                                  const struct pipe_box *src_box);
+
 struct pipe_query *
 nine_context_create_query(struct NineDevice9 *device, unsigned query_type);
 

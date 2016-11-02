@@ -162,6 +162,8 @@ struct NineDevice9
 
     /* software vertex processing */
     boolean swvp;
+    /* pure device */
+    boolean pure;
 };
 static inline struct NineDevice9 *
 NineDevice9( void *data )

@@ -2089,11 +2089,16 @@ NineDevice9_SetMaterial( struct NineDevice9 *This,
 
     user_assert(pMaterial, E_POINTER);
 
-    state->ff.material = *pMaterial;
-    if (unlikely(This->is_recording))
+    if (unlikely(This->is_recording)) {
+        state->ff.material = *pMaterial;
         state->changed.group |= NINE_STATE_FF_MATERIAL;
-    else
-        nine_context_set_material(This, pMaterial);
+        return D3D_OK;
+    }
+
+    if (!This->pure)
+        state->ff.material = *pMaterial;
+
+    nine_context_set_material(This, pMaterial);
 
     return D3D_OK;
 }
@@ -3276,13 +3281,15 @@ NineDevice9_SetVertexShaderConstantF( struct NineDevice9 *This,
         return D3D_OK;
     }
 
-    if (!memcmp(&vs_const_f[StartRegister * 4], pConstantData,
-                Vector4fCount * 4 * sizeof(state->vs_const_f[0])))
-        return D3D_OK;
+    if (!This->pure) {
+        if (!memcmp(&vs_const_f[StartRegister * 4], pConstantData,
+                    Vector4fCount * 4 * sizeof(state->vs_const_f[0])))
+            return D3D_OK;
 
-    memcpy(&vs_const_f[StartRegister * 4],
-           pConstantData,
-           Vector4fCount * 4 * sizeof(state->vs_const_f[0]));
+        memcpy(&vs_const_f[StartRegister * 4],
+               pConstantData,
+               Vector4fCount * 4 * sizeof(state->vs_const_f[0]));
+    }
 
     nine_context_set_vertex_shader_constant_f(This, StartRegister, pConstantData,
                                               Vector4fCount * 4 * sizeof(state->vs_const_f[0]),
@@ -3692,13 +3699,15 @@ NineDevice9_SetPixelShaderConstantF( struct NineDevice9 *This,
         return D3D_OK;
     }
 
-    if (!memcmp(&state->ps_const_f[StartRegister * 4], pConstantData,
-                Vector4fCount * 4 * sizeof(state->ps_const_f[0])))
-        return D3D_OK;
+    if (!This->pure) {
+        if (!memcmp(&state->ps_const_f[StartRegister * 4], pConstantData,
+                    Vector4fCount * 4 * sizeof(state->ps_const_f[0])))
+            return D3D_OK;
 
-    memcpy(&state->ps_const_f[StartRegister * 4],
-           pConstantData,
-           Vector4fCount * 4 * sizeof(state->ps_const_f[0]));
+        memcpy(&state->ps_const_f[StartRegister * 4],
+               pConstantData,
+               Vector4fCount * 4 * sizeof(state->ps_const_f[0]));
+    }
 
     nine_context_set_pixel_shader_constant_f(This, StartRegister, pConstantData,
                                              Vector4fCount * 4 * sizeof(state->ps_const_f[0]),

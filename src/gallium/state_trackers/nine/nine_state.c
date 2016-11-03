@@ -236,7 +236,7 @@ nine_csmt_get_pipe_save( struct NineDevice9 *device )
     if (!device->csmt_active)
         return device->context.pipe;
 
-    if (!ctx || !pipe_thread_is_self(ctx->worker))
+    if (!pipe_thread_is_self(ctx->worker))
         nine_csmt_process(device);
 
     return device->context.pipe;

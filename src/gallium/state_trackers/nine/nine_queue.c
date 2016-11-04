@@ -25,10 +25,10 @@
 #include "util/macros.h"
 #include "nine_helpers.h"
 
-#define NINE_QUEUES (8)
+#define NINE_QUEUES (32)
 #define NINE_QUEUES_MASK (NINE_QUEUES - 1)
 
-#define NINE_QUEUE_SIZE (1024 * 1024 * 4)
+#define NINE_QUEUE_SIZE (4352)
 
 #define DBG_CHANNEL DBG_DEVICE
 

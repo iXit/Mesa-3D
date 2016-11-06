@@ -175,16 +175,15 @@ name##_priv( struct NineDevice9 *device ARGS_FOR_DECLARATION( __VA_ARGS__ ) ); \
 static int \
 name##_rx( struct NineDevice9 *device, struct csmt_instruction *instr ) \
 { \
-    unsigned memsize = sizeof(struct s_##name##_private); \
     struct csmt_context *ctx = device->csmt_ctx; \
     struct s_##name##_private *args = (struct s_##name##_private *)instr; \
     \
-    (void) args;\
+    (void) args; \
+    (void) ctx; \
     name##_priv( \
         device ARGS_FOR_CALL( __VA_ARGS__ ) \
     ); \
     ARGS_FOR_UNBIND( __VA_ARGS__ ) \
-    nine_queue_pop(ctx->pool, memsize); \
     return 0; \
 } \
 \
@@ -207,7 +206,6 @@ name( struct NineDevice9 *device ARGS_FOR_DECLARATION( __VA_ARGS__ ) ) \
     assert(args); \
     args->instr.func = &name##_rx; \
     ARGS_FOR_ASSIGN( __VA_ARGS__ ) \
-    nine_queue_push(ctx->pool, memsize + memsize2, FALSE); \
 } \
 \
 static void \
@@ -225,15 +223,15 @@ name##_priv( struct NineDevice9 *device ARGS_FOR_DECLARATION( __VA_ARGS__ ) ); \
 static int \
 name##_rx( struct NineDevice9 *device, struct csmt_instruction *instr) \
 { \
-    unsigned memsize = sizeof(struct s_##name##_private); \
     struct csmt_context *ctx = device->csmt_ctx; \
     struct s_##name##_private *args = (struct s_##name##_private *)instr; \
     \
+    (void) args; \
+    (void) ctx; \
     name##_priv( \
         device ARGS_FOR_CALL( __VA_ARGS__ ) \
     ); \
     ARGS_FOR_UNBIND( __VA_ARGS__ ) \
-    nine_queue_pop(ctx->pool, memsize); \
     return 1; \
 } \
 \
@@ -257,7 +255,7 @@ name( struct NineDevice9 *device ARGS_FOR_DECLARATION( __VA_ARGS__ ) ) \
     args->instr.func = &name##_rx; \
     ARGS_FOR_ASSIGN( __VA_ARGS__ ) \
     ctx->processed = FALSE; \
-    nine_queue_push(ctx->pool, memsize + memsize2, TRUE); \
+    nine_queue_flush(ctx->pool); \
     nine_csmt_wait_processed(ctx); \
 } \
 \
@@ -336,7 +334,7 @@ name##_priv( struct NineDevice9 *device ARGS_FOR_DECLARATION( __VA_ARGS__ ) )
         args->_##y = y; ,\
         x y ,\
         args->_##y ,\
-        memsize += args->_##y,\
+        ,\
         memsize2 = y, \
         y
 

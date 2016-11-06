@@ -91,24 +91,26 @@ PIPE_THREAD_ROUTINE(nine_csmt_worker, arg)
     pipe_thread_setname("CSMT-Worker");
 
     while (1) {
-        /* Get instruction. Blocks until something is in the queue. */
-        instr = (struct csmt_instruction *)nine_queue_get(ctx->pool);
+        nine_queue_wait_flush(ctx->pool);
 
-        /* Check here to prevent executing queued instruction. */
+        /* Get instruction. NULL on empty cmdbuf. */
+        while (!ctx->terminate &&
+               (instr = (struct csmt_instruction *)nine_queue_get(ctx->pool))) {
+
+            /* decode */
+            if (instr->func(ctx->device, instr)) {
+                pipe_mutex_lock(ctx->mutex_processed);
+                ctx->processed = TRUE;
+                pipe_condvar_signal(ctx->event_processed);
+                pipe_mutex_unlock(ctx->mutex_processed);
+            }
+        }
         if (ctx->terminate) {
             pipe_mutex_lock(ctx->mutex_processed);
             ctx->processed = TRUE;
             pipe_condvar_signal(ctx->event_processed);
             pipe_mutex_unlock(ctx->mutex_processed);
             break;
-        }
-
-        /* decode */
-        if (instr->func(ctx->device, instr)) {
-            pipe_mutex_lock(ctx->mutex_processed);
-            ctx->processed = TRUE;
-            pipe_condvar_signal(ctx->event_processed);
-            pipe_mutex_unlock(ctx->mutex_processed);
         }
     }
 
@@ -157,10 +159,8 @@ nine_csmt_create( struct NineDevice9 *This )
 static int
 nop_func( struct NineDevice9 *This, struct csmt_instruction *instr )
 {
-    struct csmt_context *ctx = This->csmt_ctx;
+    (void) This;
     (void) instr;
-
-    nine_queue_pop(ctx->pool, sizeof(struct csmt_instruction));
 
     return 1;
 }
@@ -184,7 +184,7 @@ nine_csmt_process( struct NineDevice9 *device )
     instr->func = nop_func;
 
     ctx->processed = FALSE;
-    nine_queue_push(ctx->pool, sizeof(struct csmt_instruction), TRUE);
+    nine_queue_flush(ctx->pool);
 
     nine_csmt_wait_processed(ctx);
 }
@@ -209,7 +209,7 @@ nine_csmt_destroy( struct NineDevice9 *device, struct csmt_context *ctx )
     ctx->terminate = TRUE;
 
     ctx->processed = FALSE;
-    nine_queue_push(ctx->pool, sizeof(struct csmt_instruction), TRUE);
+    nine_queue_flush(ctx->pool);
 
     nine_csmt_wait_processed(ctx);
     nine_queue_delete(ctx->pool);

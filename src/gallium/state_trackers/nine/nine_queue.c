@@ -25,10 +25,12 @@
 #include "util/macros.h"
 #include "nine_helpers.h"
 
-#define NINE_QUEUES (32)
-#define NINE_QUEUES_MASK (NINE_QUEUES - 1)
+#define NINE_CMD_BUF_INSTR (256)
 
-#define NINE_QUEUE_SIZE (4352)
+#define NINE_CMD_BUFS (32)
+#define NINE_CMD_BUFS_MASK (NINE_CMD_BUFS - 1)
+
+#define NINE_QUEUE_SIZE (8192 * 16 + 128)
 
 #define DBG_CHANNEL DBG_DEVICE
 
@@ -36,37 +38,40 @@
  * Single producer - single consumer pool queue
  *
  * Producer:
- *  Allocates slices of memory on a queue. The queue doesn't know about how many
- *  slices of memory are already allocated, and it doesn't know about it's size.
- *  The queue is pushed to the consumer by two events:
- *   * an allocation would overflow the current queue
- *   * by caller request
- *  The producer is blocked if all NINE_QUEUES queues are full.
+ * Calls nine_queue_alloc to get a slice of memory in current cmdbuf.
+ * Calls nine_queue_flush to flush the queue by request.
+ * The queue is flushed automatically on insufficient space or once the
+ * cmdbuf contains NINE_CMD_BUF_INSTR instructions.
+ *
+ * nine_queue_flush does block, while nine_queue_alloc doesn't block.
+ *
+ * nine_queue_alloc returns NULL on insufficent space.
  *
  * Consumer:
- *  Returns a pointer to memory on a queue. The queue doesn't know about how many
- *  slices of memory are still allocated, and it doesn't know about it's size.
- *  The consumer is blocked if all NINE_QUEUES are empty.
+ * Calls nine_queue_wait_flush to wait for a cmdbuf.
+ * After waiting for a cmdbuf it calls nine_queue_get until NULL is returned.
+ *
+ * nine_queue_wait_flush does block, while nine_queue_get doesn't block.
  *
  * Constrains:
- *  The caller has to provide correct memory slice size for allocation and deallocation.
- *  Assuming that only fixed size elements are passed, the sizeof operator could be used
- *  to provide this value.
+ * Only a single consumer and a single producer are supported.
  *
- * A pool of NINE_QUEUES queues are allocated, each with a size of NINE_QUEUE_SIZE.
  */
 
-struct nine_queue {
-    unsigned head;
-    unsigned tail;
+struct nine_cmdbuf {
+    unsigned instr_size[NINE_CMD_BUF_INSTR];
+    unsigned num_instr;
+    unsigned offset;
     void *mem_pool;
     BOOL full;
 };
 
 struct nine_queue_pool {
-    struct nine_queue pool[NINE_QUEUES];
+    struct nine_cmdbuf pool[NINE_CMD_BUFS];
     unsigned head;
     unsigned tail;
+    unsigned cur_instr;
+    BOOL worker_wait;
     pipe_condvar event_pop;
     pipe_condvar event_push;
     pipe_mutex mutex_pop;
@@ -74,65 +79,91 @@ struct nine_queue_pool {
 };
 
 /* Consumer functions: */
-static void
-nine_queue_free(struct nine_queue* ctx)
+void
+nine_queue_wait_flush(struct nine_queue_pool* ctx)
 {
-    ctx->head = ctx->tail = ctx->full = 0;
+    struct nine_cmdbuf *cmdbuf = &ctx->pool[ctx->tail];
+
+    /* wait for cmdbuf full */
+    pipe_mutex_lock(ctx->mutex_push);
+    while (!cmdbuf->full)
+    {
+        DBG("waiting for full cmdbuf\n");
+        pipe_condvar_wait(ctx->event_push, ctx->mutex_push);
+    }
+    DBG("got cmdbuf=%p\n", cmdbuf);
+    pipe_mutex_unlock(ctx->mutex_push);
+
+    cmdbuf->offset = 0;
+    ctx->cur_instr = 0;
 }
 
 /* Gets a pointer to the next memory slice.
- * Blocks if none in queue. */
+ * Does not block.
+ * Returns NULL on empty cmdbuf. */
 void *
 nine_queue_get(struct nine_queue_pool* ctx)
 {
-    struct nine_queue *queue = &ctx->pool[ctx->tail];
+    struct nine_cmdbuf *cmdbuf = &ctx->pool[ctx->tail];
+    unsigned offset;
 
-    /* wait for queue full */
-    pipe_mutex_lock(ctx->mutex_push);
-    while (!queue->full)
-    {
-        pipe_condvar_wait(ctx->event_push, ctx->mutex_push);
-    }
-    pipe_mutex_unlock(ctx->mutex_push);
+    /* At this pointer there's always a cmdbuf. */
 
-    return queue->mem_pool + queue->tail;
-}
-
-/* Frees a slice of memory with size @space.
- * Doesn't block.
- * Signals producer on fully processed queue. */
-void
-nine_queue_pop(struct nine_queue_pool* ctx, unsigned space)
-{
-    struct nine_queue *queue = &ctx->pool[ctx->tail];
-
-    queue->tail += space;
-
-    if (queue->tail == queue->head) {
+    if (ctx->cur_instr == cmdbuf->num_instr) {
+        /* signal waiting producer */
         pipe_mutex_lock(ctx->mutex_pop);
-        nine_queue_free(queue);
+        DBG("freeing cmdbuf=%p\n", cmdbuf);
+        cmdbuf->full = 0;
         pipe_condvar_signal(ctx->event_pop);
         pipe_mutex_unlock(ctx->mutex_pop);
 
-        ctx->tail = (ctx->tail + 1) & NINE_QUEUES_MASK;
+        ctx->tail = (ctx->tail + 1) & NINE_CMD_BUFS_MASK;
+
+        return NULL;
     }
+
+    /* At this pointer there's always a cmdbuf with instruction to process. */
+    offset = cmdbuf->offset;
+    cmdbuf->offset += cmdbuf->instr_size[ctx->cur_instr];
+    ctx->cur_instr ++;
+
+    return cmdbuf->mem_pool + offset;
 }
 
 /* Producer functions: */
 
-/* Flush queue and push it to consumer thread. */
-static void
-nine_queue_submit(struct nine_queue_pool* ctx)
+/* Flushes the queue.
+ * Moves the current cmdbuf to worker thread.
+ * Blocks until next cmdbuf is free. */
+void
+nine_queue_flush(struct nine_queue_pool* ctx)
 {
-    struct nine_queue *queue = &ctx->pool[ctx->head];
+    struct nine_cmdbuf *cmdbuf = &ctx->pool[ctx->head];
+
+    DBG("flushing cmdbuf=%p instr=%d size=%d\n",
+           cmdbuf, cmdbuf->num_instr, cmdbuf->offset);
 
     /* signal waiting worker */
     pipe_mutex_lock(ctx->mutex_push);
-    queue->full = 1;
+    cmdbuf->full = 1;
     pipe_condvar_signal(ctx->event_push);
     pipe_mutex_unlock(ctx->mutex_push);
 
-    ctx->head = (ctx->head + 1) & NINE_QUEUES_MASK;
+    ctx->head = (ctx->head + 1) & NINE_CMD_BUFS_MASK;
+
+    cmdbuf = &ctx->pool[ctx->head];
+
+    /* wait for queue empty */
+    pipe_mutex_lock(ctx->mutex_pop);
+    while (cmdbuf->full)
+    {
+        DBG("waiting for empty cmdbuf\n");
+        pipe_condvar_wait(ctx->event_pop, ctx->mutex_pop);
+    }
+    DBG("got empty cmdbuf=%p\n", cmdbuf);
+    pipe_mutex_unlock(ctx->mutex_pop);
+    cmdbuf->offset = 0;
+    cmdbuf->num_instr = 0;
 }
 
 /* Gets a a pointer to slice of memory with size @space.
@@ -141,48 +172,32 @@ nine_queue_submit(struct nine_queue_pool* ctx)
 void *
 nine_queue_alloc(struct nine_queue_pool* ctx, unsigned space)
 {
-    struct nine_queue *queue = &ctx->pool[ctx->head];
+    unsigned offset;
+    struct nine_cmdbuf *cmdbuf = &ctx->pool[ctx->head];
 
     if (space > NINE_QUEUE_SIZE)
         return NULL;
 
-    /* wait for queue empty */
-    pipe_mutex_lock(ctx->mutex_pop);
-    while (queue->full)
-    {
-        pipe_condvar_wait(ctx->event_pop, ctx->mutex_pop);
-    }
-    pipe_mutex_unlock(ctx->mutex_pop);
+    /* at this pointer there's always a free queue available */
 
-    if (queue->head + space > NINE_QUEUE_SIZE) {
+    if ((cmdbuf->offset + space > NINE_QUEUE_SIZE) ||
+        (cmdbuf->num_instr == NINE_CMD_BUF_INSTR)) {
 
-        nine_queue_submit(ctx);
+        nine_queue_flush(ctx);
 
-        queue = &ctx->pool[ctx->head];
-
-        /* wait for queue empty */
-        pipe_mutex_lock(ctx->mutex_pop);
-        while (queue->full)
-        {
-            pipe_condvar_wait(ctx->event_pop, ctx->mutex_pop);
-        }
-        pipe_mutex_unlock(ctx->mutex_pop);
+        cmdbuf = &ctx->pool[ctx->head];
     }
 
-    return queue->mem_pool + queue->head;
-}
+    DBG("cmdbuf=%p space=%d\n", cmdbuf, space);
 
-/* Pushes a slice of memory with size @space.
- * Doesn't block.
- * Flushes the queue on @flush . */
-void
-nine_queue_push(struct nine_queue_pool* ctx, unsigned space, bool flush)
-{
-    struct nine_queue *queue = &ctx->pool[ctx->head];
-    queue->head += space;
+    /* at this pointer there's always a free queue with sufficient space available */
 
-    if (flush)
-        nine_queue_submit(ctx);
+    offset = cmdbuf->offset;
+    cmdbuf->offset += space;
+    cmdbuf->instr_size[cmdbuf->num_instr] = space;
+    cmdbuf->num_instr ++;
+
+    return cmdbuf->mem_pool + offset;
 }
 
 struct nine_queue_pool*
@@ -195,7 +210,7 @@ nine_queue_create(void)
     if (!ctx)
         goto failed;
 
-    for (i = 0; i < NINE_QUEUES; i++) {
+    for (i = 0; i < NINE_CMD_BUFS; i++) {
         ctx->pool[i].mem_pool = MALLOC(NINE_QUEUE_SIZE);
         if (!ctx->pool[i].mem_pool)
             goto failed;
@@ -207,10 +222,13 @@ nine_queue_create(void)
     pipe_condvar_init(ctx->event_push);
     pipe_mutex_init(ctx->mutex_push);
 
+    /* Block until first cmdbuf has been flushed. */
+    ctx->worker_wait = TRUE;
+
     return ctx;
 failed:
     if (ctx) {
-        for (i = 0; i < NINE_QUEUES; i++) {
+        for (i = 0; i < NINE_CMD_BUFS; i++) {
             if (ctx->pool[i].mem_pool)
                 FREE(ctx->pool[i].mem_pool);
         }
@@ -226,7 +244,7 @@ nine_queue_delete(struct nine_queue_pool *ctx)
     pipe_mutex_destroy(ctx->mutex_pop);
     pipe_mutex_destroy(ctx->mutex_push);
 
-    for (i = 0; i < NINE_QUEUES; i++)
+    for (i = 0; i < NINE_CMD_BUFS; i++)
         FREE(ctx->pool[i].mem_pool);
 
     FREE(ctx);

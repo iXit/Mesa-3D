@@ -27,17 +27,17 @@
 
 struct nine_queue_pool;
 
+void
+nine_queue_wait_flush(struct nine_queue_pool* ctx);
+
 void *
 nine_queue_get(struct nine_queue_pool* ctx);
 
 void
-nine_queue_pop(struct nine_queue_pool* ctx, unsigned space);
+nine_queue_flush(struct nine_queue_pool* ctx);
 
 void *
 nine_queue_alloc(struct nine_queue_pool* ctx, unsigned space);
-
-void
-nine_queue_push(struct nine_queue_pool* ctx, unsigned space, bool submit);
 
 struct nine_queue_pool*
 nine_queue_create(void);

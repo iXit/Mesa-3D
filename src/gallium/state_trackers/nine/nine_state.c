@@ -208,6 +208,7 @@ nine_csmt_destroy( struct NineDevice9 *device, struct csmt_context *ctx )
     /* Signal worker to terminate. */
     ctx->terminate = TRUE;
 
+    ctx->processed = FALSE;
     nine_queue_push(ctx->pool, sizeof(struct csmt_instruction), TRUE);
 
     nine_csmt_wait_processed(ctx);

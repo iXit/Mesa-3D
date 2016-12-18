@@ -369,6 +369,17 @@ The integer capabilities:
 * ``PIPE_CAP_THREAD_SAFE``: Whether the driver is thread-safe. It is allowed to
   use at the same time several pipe_contexts in different threads, or a
   pipe_screen in a different thread than one of its pipe_context.
+* ``PIPE_CAP_BUFFER_TRANSFER_EXTERNAL_CONTEXT``: Whether
+  PIPE_RESOURCE_FLAG_TRANSFER_EXTERNAL_CONTEXT is supported for buffers.
+  When the flag is set, the resource may be mapped/unmapped in a different
+  context than the context using it. Like for other resources, resources with
+  this flag must be unmapped before any draw call, except with combination
+  of persistent/coherent where the resource may be mapped on one context,
+  and used for a draw call in another. No flush is required after unmapping
+  the resource to make all contexts see the change. If a memory_barrier call
+  is needed, it may be done from either context. Previous rendering using the
+  resource must be flushed if a transfer_map with a different context is
+  expected to wait for them.
 
 
 .. _pipe_capf:

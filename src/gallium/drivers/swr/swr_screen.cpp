@@ -319,6 +319,7 @@ swr_get_param(struct pipe_screen *screen, enum pipe_cap param)
    case PIPE_CAP_STREAM_OUTPUT_PAUSE_RESUME:
    case PIPE_CAP_NATIVE_FENCE_FD:
    case PIPE_CAP_THREAD_SAFE:
+   case PIPE_CAP_BUFFER_TRANSFER_EXTERNAL_CONTEXT:
       return 0;
 
    case PIPE_CAP_VENDOR_ID:

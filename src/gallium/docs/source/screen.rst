@@ -366,6 +366,9 @@ The integer capabilities:
   ARB_transform_feedback3.
 * ``PIPE_CAP_TGSI_CAN_READ_OUTPUTS``: Whether every TGSI shader stage can read
   from the output file.
+* ``PIPE_CAP_THREAD_SAFE``: Whether the driver is thread-safe. It is allowed to
+  use at the same time several pipe_contexts in different threads, or a
+  pipe_screen in a different thread than one of its pipe_context.
 
 
 .. _pipe_capf:

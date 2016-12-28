@@ -242,8 +242,13 @@ NineBuffer9_Lock( struct NineBuffer9 *This,
                 This->managed.dirty_box = box;
                 if (p_atomic_read(&This->managed.pending_upload))
                     nine_csmt_process(This->base.base.device);
-            } else
-                u_box_union_2d(&This->managed.dirty_box, &This->managed.dirty_box, &box);
+            } else {
+                if (This->managed.dirty_box.width == 0) {
+                    memcpy(&This->managed.dirty_box, &box, sizeof(struct pipe_box));
+                } else {
+                    u_box_union_2d(&This->managed.dirty_box, &This->managed.dirty_box, &box);
+                }
+            }
             /* Tests trying to draw while the buffer is locked show that
              * MANAGED buffers are made dirty at Lock time */
             BASEBUF_REGISTER_UPDATE(This);

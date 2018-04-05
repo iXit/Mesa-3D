@@ -1102,8 +1102,38 @@ tx_src_param(struct shader_translator *tx, const struct sm1_src_param *param)
         if (param->rel || !tx_lconstf(tx, &src, param->idx)) {
             src = nine_float_constant_src(tx, param->idx);
             if (param->rel) {
+                struct ureg_src src_a0;
+                struct ureg_dst tmp2;
+
                 tx->indirect_const_access = TRUE;
                 src = ureg_src_indirect(src, tx_src_param(tx, param->rel));
+
+                assert(param->rel->file == D3DSPR_ADDR &&
+                    param->rel->mod == NINED3DSPSM_NONE);
+
+                src_a0 = ureg_src(tx->regs.a0);
+
+                if (param->rel->swizzle != NINED3DSP_NOSWIZZLE)
+                    src_a0 = ureg_swizzle(src_a0,
+                                          (param->rel->swizzle >> 0) & 0x3,
+                                          (param->rel->swizzle >> 2) & 0x3,
+                                          (param->rel->swizzle >> 4) & 0x3,
+                                          (param->rel->swizzle >> 6) & 0x3);
+                else if (tx->version.major < 2)
+                    /* On vs 1.1, a0 has only one component, thus
+                     * NINED3DSP_NOSWIZZLE means a0.x */
+                    src_a0 = ureg_scalar(src_a0, TGSI_SWIZZLE_X);
+
+                tmp = tx_scratch(tx);
+                tmp2 = tx_scratch(tx);
+                /* If a0+idx is below -0.5 (round(a0+idx) < 0) replace value by 0.0 */
+                ureg_ADD(ureg, tmp, src_a0, ureg_imm1f(ureg, param->idx + 0.5f));
+                ureg_CMP(ureg, tmp2, ureg_src(tmp), ureg_imm1f(ureg, 0.0f), src);
+                /* If a0+idx is above or equal to 255.5 (round(a0+idx) > 255)
+                 * replace value by 0.0 */
+                ureg_ADD(ureg, tmp, ureg_src(tmp), ureg_imm1f(ureg, -256.f));
+                ureg_CMP(ureg, tmp2, ureg_src(tmp), ureg_src(tmp2), ureg_imm1f(ureg, 0.0f));
+                src = ureg_src(tmp2);
             }
         }
         if (!IS_VS && tx->version.major < 2) {

@@ -979,6 +979,8 @@ tx_src_param(struct shader_translator *tx, const struct sm1_src_param *param)
                 }
             }
         }
+        if (param->rel)
+            src = ureg_src_indirect(src, tx_src_param(tx, param->rel));
         break;
     case D3DSPR_PREDICATE:
         if (ureg_dst_is_undef(tx->regs.predicate)) {
@@ -994,8 +996,6 @@ tx_src_param(struct shader_translator *tx, const struct sm1_src_param *param)
         src = ureg_src_register(TGSI_FILE_SAMPLER, param->idx);
         break;
     case D3DSPR_CONST:
-        if (param->rel)
-            tx->indirect_const_access = TRUE;
         if (param->rel || !tx_lconstf(tx, &src, param->idx)) {
             if (!param->rel)
                 nine_info_mark_const_f_used(tx->info, param->idx);
@@ -1019,6 +1019,10 @@ tx_src_param(struct shader_translator *tx, const struct sm1_src_param *param)
                 }
             } else
                 src = NINE_CONSTANT_SRC(param->idx);
+            if (param->rel) {
+                tx->indirect_const_access = TRUE;
+                src = ureg_src_indirect(src, tx_src_param(tx, param->rel));
+            }
         }
         if (!IS_VS && tx->version.major < 2) {
             /* ps 1.X clamps constants */
@@ -1113,8 +1117,6 @@ tx_src_param(struct shader_translator *tx, const struct sm1_src_param *param)
     default:
         assert(!"invalid src D3DSPR");
     }
-    if (param->rel)
-        src = ureg_src_indirect(src, tx_src_param(tx, param->rel));
 
     switch (param->mod) {
     case NINED3DSPSM_DW:

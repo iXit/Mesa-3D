@@ -906,16 +906,17 @@ tx_src_param(struct shader_translator *tx, const struct sm1_src_param *param)
     struct ureg_src src;
     struct ureg_dst tmp;
 
+    assert(!param->rel || (IS_VS && param->file == D3DSPR_CONST) ||
+        (D3DSPR_ADDR && tx->version.major == 3));
+
     switch (param->file)
     {
     case D3DSPR_TEMP:
-        assert(!param->rel);
         tx_temp_alloc(tx, param->idx);
         src = ureg_src(tx->regs.r[param->idx]);
         break;
  /* case D3DSPR_TEXTURE: == D3DSPR_ADDR */
     case D3DSPR_ADDR:
-        assert(!param->rel);
         if (IS_VS) {
             assert(param->idx == 0);
             /* the address register (vs only) must be
@@ -943,7 +944,6 @@ tx_src_param(struct shader_translator *tx, const struct sm1_src_param *param)
             src = ureg_src_register(TGSI_FILE_INPUT, param->idx);
         } else {
             if (tx->version.major < 3) {
-                assert(!param->rel);
                 src = ureg_DECL_fs_input_cyl_centroid(
                     ureg, TGSI_SEMANTIC_COLOR, param->idx,
                     TGSI_INTERPOLATE_COLOR, 0,
@@ -991,11 +991,9 @@ tx_src_param(struct shader_translator *tx, const struct sm1_src_param *param)
     case D3DSPR_SAMPLER:
         assert(param->mod == NINED3DSPSM_NONE);
         assert(param->swizzle == NINED3DSP_NOSWIZZLE);
-        assert(!param->rel);
         src = ureg_src_register(TGSI_FILE_SAMPLER, param->idx);
         break;
     case D3DSPR_CONST:
-        assert(!param->rel || IS_VS);
         if (param->rel)
             tx->indirect_const_access = TRUE;
         if (param->rel || !tx_lconstf(tx, &src, param->idx)) {
@@ -1039,7 +1037,6 @@ tx_src_param(struct shader_translator *tx, const struct sm1_src_param *param)
         break;
     case D3DSPR_CONSTINT:
         /* relative adressing only possible for float constants in vs */
-        assert(!param->rel);
         if (!tx_lconsti(tx, &src, param->idx)) {
             nine_info_mark_const_i_used(tx->info, param->idx);
             if (IS_VS && tx->info->swvp_on) {
@@ -1050,7 +1047,6 @@ tx_src_param(struct shader_translator *tx, const struct sm1_src_param *param)
         }
         break;
     case D3DSPR_CONSTBOOL:
-        assert(!param->rel);
         if (!tx_lconstb(tx, &src, param->idx)) {
            char r = param->idx / 4;
            char s = param->idx & 3;
@@ -1111,7 +1107,6 @@ tx_src_param(struct shader_translator *tx, const struct sm1_src_param *param)
             assert(!"invalid src D3DSMO");
             break;
         }
-        assert(!param->rel);
         break;
     case D3DSPR_TEMPFLOAT16:
         break;

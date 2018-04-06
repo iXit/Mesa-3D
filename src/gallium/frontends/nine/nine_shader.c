@@ -1102,14 +1102,15 @@ tx_src_param(struct shader_translator *tx, const struct sm1_src_param *param)
         if (param->rel || !tx_lconstf(tx, &src, param->idx)) {
             src = nine_float_constant_src(tx, param->idx);
             if (param->rel) {
+                tx->indirect_const_access = TRUE;
+                src = ureg_src_indirect(src, tx_src_param(tx, param->rel));
+            }
+            /* Check bounds for a0 (probably not needed for aL) */
+            if (param->rel && param->rel->file == D3DSPR_ADDR) {
                 struct ureg_src src_a0;
                 struct ureg_dst tmp2;
 
-                tx->indirect_const_access = TRUE;
-                src = ureg_src_indirect(src, tx_src_param(tx, param->rel));
-
-                assert(param->rel->file == D3DSPR_ADDR &&
-                    param->rel->mod == NINED3DSPSM_NONE);
+                assert(param->rel->mod == NINED3DSPSM_NONE);
 
                 src_a0 = ureg_src(tx->regs.a0);
 

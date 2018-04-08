@@ -3486,6 +3486,9 @@ tx_ctor(struct shader_translator *tx, struct nine_shader_info *info)
     info->position_t = FALSE;
     info->point_size = FALSE;
 
+    memset(info->int_slots_used, 0, sizeof(info->int_slots_used));
+    memset(info->bool_slots_used, 0, sizeof(info->bool_slots_used));
+
     tx->info->const_float_slots = 0;
     tx->info->const_int_slots = 0;
     tx->info->const_bool_slots = 0;
@@ -3695,6 +3698,32 @@ nine_translate_shader(struct NineDevice9 *device, struct nine_shader_info *info,
     tx->mul_zero_wins = GET_CAP(TGSI_MUL_ZERO_WINS);
     if (tx->mul_zero_wins)
        ureg_property(tx->ureg, TGSI_PROPERTY_MUL_ZERO_WINS, 1);
+
+    /* Add additional definition of constants */
+    if (info->add_constants_defs.c_combination) {
+        unsigned i;
+
+        assert(info->add_constants_defs.int_const_added);
+        assert(info->add_constants_defs.bool_const_added);
+        /* We only add constants that are used by the shader
+         * and that are not defined in the shader */
+        for (i = 0; i < NINE_MAX_CONST_I; ++i) {
+            if ((*info->add_constants_defs.int_const_added)[i]) {
+                DBG("Defining const i%i : { %i %i %i %i }\n", i,
+                    info->add_constants_defs.c_combination->const_i[i][0],
+                    info->add_constants_defs.c_combination->const_i[i][1],
+                    info->add_constants_defs.c_combination->const_i[i][2],
+                    info->add_constants_defs.c_combination->const_i[i][3]);
+                tx_set_lconsti(tx, i, info->add_constants_defs.c_combination->const_i[i]);
+            }
+        }
+        for (i = 0; i < NINE_MAX_CONST_B; ++i) {
+            if ((*info->add_constants_defs.bool_const_added)[i]) {
+                DBG("Defining const b%i : %i\n", i, (int)(info->add_constants_defs.c_combination->const_b[i] != 0));
+                tx_set_lconstb(tx, i, info->add_constants_defs.c_combination->const_b[i]);
+            }
+        }
+    }
 
     while (!sm1_parse_eof(tx) && !tx->failure)
         sm1_parse_instruction(tx);

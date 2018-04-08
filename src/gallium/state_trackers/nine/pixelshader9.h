@@ -49,6 +49,14 @@ struct NinePixelShader9
     uint16_t sampler_mask;
     uint8_t rt_mask;
 
+    boolean int_slots_used[NINE_MAX_CONST_I];
+    boolean bool_slots_used[NINE_MAX_CONST_B];
+
+    unsigned const_int_slots;
+    unsigned const_bool_slots;
+
+    struct nine_shader_constant_combination *c_combinations;
+
     uint64_t ff_key[6];
     void *ff_cso;
 
@@ -98,6 +106,13 @@ NinePixelShader9_UpdateKey( struct NinePixelShader9 *ps,
     /* centroid interpolation automatically used for color ps inputs */
     if (context->rt[0]->base.info.nr_samples)
         key |= ((uint64_t)1) << 34;
+
+    if ((ps->const_int_slots > 0 || ps->const_bool_slots > 0) && context->inline_constants)
+        key |= ((uint64_t)nine_shader_constant_combination_key(&ps->c_combinations,
+                                                               ps->int_slots_used,
+                                                               ps->bool_slots_used,
+                                                               (void *)context->ps_const_i,
+                                                               context->ps_const_b)) << 40;
 
     if (unlikely(ps->byte_code.version < 0x14)) {
         projected = nine_ff_get_projected_key(context);

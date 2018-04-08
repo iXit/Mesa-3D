@@ -300,6 +300,8 @@ struct nine_context {
     int dummy_vbo_bound_at; /* -1 = not bound , >= 0 = bound index */
     boolean vbo_bound_done;
 
+    boolean inline_constants;
+
     struct nine_ff_state ff;
 
     /* software vertex processing */

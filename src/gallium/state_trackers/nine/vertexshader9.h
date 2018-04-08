@@ -59,6 +59,14 @@ struct NineVertexShader9
 
     struct nine_lconstf lconstf;
 
+    boolean int_slots_used[NINE_MAX_CONST_I];
+    boolean bool_slots_used[NINE_MAX_CONST_B];
+
+    unsigned const_int_slots;
+    unsigned const_bool_slots;
+
+    struct nine_shader_constant_combination *c_combinations;
+
     uint64_t ff_key[3];
     void *ff_cso;
 
@@ -92,6 +100,13 @@ NineVertexShader9_UpdateKey( struct NineVertexShader9 *vs,
     if (vs->byte_code.version < 0x30)
         key |= (uint32_t) ((!!context->rs[D3DRS_FOGENABLE]) << 8);
     key |= (uint32_t) (context->swvp << 9);
+
+    if ((vs->const_int_slots > 0 || vs->const_bool_slots > 0) && context->inline_constants && !context->swvp)
+        key |= ((uint64_t)nine_shader_constant_combination_key(&vs->c_combinations,
+                                                               vs->int_slots_used,
+                                                               vs->bool_slots_used,
+                                                               context->vs_const_i,
+                                                               context->vs_const_b)) << 16;
 
     /* We want to use a 64 bits key for performance.
      * Use compressed float16 values for the pointsize min/max in the key.

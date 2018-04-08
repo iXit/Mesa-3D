@@ -27,6 +27,7 @@
 #include "d3d9caps.h"
 #include "nine_defines.h"
 #include "nine_helpers.h"
+#include "nine_state.h"
 #include "pipe/p_state.h" /* PIPE_MAX_ATTRIBS */
 #include "util/u_memory.h"
 
@@ -38,6 +39,8 @@ struct nine_lconstf /* NOTE: both pointers should be FREE'd by the user */
     struct nine_range *ranges; /* single MALLOC, but next-pointers valid */
     float *data;
 };
+
+struct nine_shader_constant_combination;
 
 struct nine_shader_info
 {
@@ -72,12 +75,21 @@ struct nine_shader_info
     unsigned const_b_base; /* in vec4 (16 byte) units */
     unsigned const_used_size;
 
+    boolean int_slots_used[NINE_MAX_CONST_I];
+    boolean bool_slots_used[NINE_MAX_CONST_B];
+
     unsigned const_float_slots;
     unsigned const_int_slots;
     unsigned const_bool_slots;
 
     struct nine_lconstf lconstf; /* out, NOTE: members to be free'd by user */
     uint8_t bumpenvmat_needed;
+
+    struct {
+        struct nine_shader_constant_combination* c_combination;
+        boolean (*int_const_added)[NINE_MAX_CONST_I];
+        boolean (*bool_const_added)[NINE_MAX_CONST_B];
+    } add_constants_defs;
 
     boolean swvp_on;
 
@@ -103,12 +115,16 @@ nine_info_mark_const_f_used(struct nine_shader_info *info, int idx)
 static inline void
 nine_info_mark_const_i_used(struct nine_shader_info *info, int idx)
 {
+    if (!info->swvp_on)
+        info->int_slots_used[idx] = TRUE;
     if (info->const_int_slots < (idx + 1))
         info->const_int_slots = idx + 1;
 }
 static inline void
 nine_info_mark_const_b_used(struct nine_shader_info *info, int idx)
 {
+    if (!info->swvp_on)
+        info->bool_slots_used[idx] = TRUE;
     if (info->const_bool_slots < (idx + 1))
         info->const_bool_slots = idx + 1;
 }
@@ -222,6 +238,93 @@ nine_shader_variants_so_free(struct nine_shader_variant_so *list)
     }
     if (list->vdecl)
         nine_bind(&list->vdecl, NULL);
+}
+
+struct nine_shader_constant_combination
+{
+    struct nine_shader_constant_combination *next;
+    int const_i[NINE_MAX_CONST_I][4];
+    BOOL const_b[NINE_MAX_CONST_B];
+};
+
+#define NINE_MAX_CONSTANT_COMBINATION_VARIANTS 32
+
+static inline uint8_t
+nine_shader_constant_combination_key(struct nine_shader_constant_combination **list,
+                                     boolean *int_slots_used,
+                                     boolean *bool_slots_used,
+                                     int *const_i,
+                                     BOOL *const_b)
+{
+    int i;
+    uint8_t index = 0;
+    boolean match;
+    struct nine_shader_constant_combination **next_allocate = list, *current = *list;
+
+    assert(int_slots_used);
+    assert(bool_slots_used);
+    assert(const_i);
+    assert(const_b);
+
+    while (current) {
+        index++; /* start at 1. 0 is for the variant without constant replacement */
+        match = TRUE;
+        for (i = 0; i < NINE_MAX_CONST_I; ++i) {
+            if (int_slots_used[i])
+                match &= !memcmp(const_i + 4*i, current->const_i[i], sizeof(current->const_i[0]));
+        }
+        for (i = 0; i < NINE_MAX_CONST_B; ++i) {
+            if (bool_slots_used[i])
+                match &= const_b[i] == current->const_b[i];
+        }
+        if (match)
+            return index;
+        next_allocate = &current->next;
+        current = current->next;
+    }
+
+    if (index < NINE_MAX_CONSTANT_COMBINATION_VARIANTS) {
+        *next_allocate = MALLOC_STRUCT(nine_shader_constant_combination);
+        current = *next_allocate;
+        index++;
+        current->next = NULL;
+        memcpy(current->const_i, const_i, sizeof(current->const_i));
+        memcpy(current->const_b, const_b, sizeof(current->const_b));
+        return index;
+    }
+
+    return 0; /* Too many variants, revert to no replacement */
+}
+
+static inline struct nine_shader_constant_combination *
+nine_shader_constant_combination_get(struct nine_shader_constant_combination *list, uint8_t index)
+{
+    if (index == 0)
+        return NULL;
+    while (index) {
+        assert(list != NULL);
+        index--;
+        if (index == 0)
+            return list;
+        list = list->next;
+    }
+    assert(FALSE);
+    return NULL;
+}
+
+static inline void
+nine_shader_constant_combination_free(struct nine_shader_constant_combination *list)
+{
+    if (!list)
+        return;
+
+    while (list->next) {
+        struct nine_shader_constant_combination *ptr = list->next;
+        list->next = ptr->next;
+        FREE(ptr);
+    }
+
+    FREE(list);
 }
 
 #endif /* _NINE_SHADER_H_ */

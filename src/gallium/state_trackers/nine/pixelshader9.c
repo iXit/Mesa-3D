@@ -60,6 +60,9 @@ NinePixelShader9_ctor( struct NinePixelShader9 *This,
     info.sampler_ps1xtypes = 0x0;
     info.fog_enable = 0;
     info.projected = 0;
+    info.add_constants_defs.c_combination = NULL;
+    info.add_constants_defs.int_const_added = NULL;
+    info.add_constants_defs.bool_const_added = NULL;
     info.process_vertices = false;
 
     pipe = nine_context_get_pipe_acquire(device);
@@ -82,6 +85,15 @@ NinePixelShader9_ctor( struct NinePixelShader9 *This,
     This->rt_mask = info.rt_mask;
     This->const_used_size = info.const_used_size;
     This->bumpenvmat_needed = info.bumpenvmat_needed;
+
+    memcpy(This->int_slots_used, info.int_slots_used, sizeof(This->int_slots_used));
+    memcpy(This->bool_slots_used, info.bool_slots_used, sizeof(This->bool_slots_used));
+
+    This->const_int_slots = info.const_int_slots;
+    This->const_bool_slots = info.const_bool_slots;
+
+    This->c_combinations = NULL;
+
     /* no constant relative addressing for ps */
     assert(info.lconstf.data == NULL);
     assert(info.lconstf.ranges == NULL);
@@ -114,6 +126,8 @@ NinePixelShader9_dtor( struct NinePixelShader9 *This )
         }
     }
     nine_shader_variants_free(&This->variant);
+
+    nine_shader_constant_combination_free(This->c_combinations);
 
     FREE((void *)This->byte_code.tokens); /* const_cast */
 
@@ -169,6 +183,10 @@ NinePixelShader9_GetVariant( struct NinePixelShader9 *This )
         info.fog_mode = device->context.rs[D3DRS_FOGTABLEMODE];
         info.force_color_in_centroid = key >> 34 & 1;
         info.projected = (key >> 48) & 0xffff;
+        info.add_constants_defs.c_combination =
+            nine_shader_constant_combination_get(This->c_combinations, (key >> 40) & 0xff);
+        info.add_constants_defs.int_const_added = &This->int_slots_used;
+        info.add_constants_defs.bool_const_added = &This->bool_slots_used;
         info.process_vertices = false;
 
         hr = nine_translate_shader(This->base.device, &info, pipe);

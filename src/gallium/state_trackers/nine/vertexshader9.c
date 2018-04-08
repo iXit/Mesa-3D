@@ -66,6 +66,9 @@ NineVertexShader9_ctor( struct NineVertexShader9 *This,
     info.fog_enable = 0;
     info.point_size_min = 0;
     info.point_size_max = 0;
+    info.add_constants_defs.c_combination = NULL;
+    info.add_constants_defs.int_const_added = NULL;
+    info.add_constants_defs.bool_const_added = NULL;
     info.swvp_on = !!(device->params.BehaviorFlags & D3DCREATE_SOFTWARE_VERTEXPROCESSING);
     info.process_vertices = false;
 
@@ -99,6 +102,14 @@ NineVertexShader9_ctor( struct NineVertexShader9 *This,
     This->sampler_mask = info.sampler_mask;
     This->position_t = info.position_t;
     This->point_size = info.point_size;
+
+    memcpy(This->int_slots_used, info.int_slots_used, sizeof(This->int_slots_used));
+    memcpy(This->bool_slots_used, info.bool_slots_used, sizeof(This->bool_slots_used));
+
+    This->const_int_slots = info.const_int_slots;
+    This->const_bool_slots = info.const_bool_slots;
+
+    This->c_combinations = NULL;
 
     for (i = 0; i < info.num_inputs && i < ARRAY_SIZE(This->input_map); ++i)
         This->input_map[i].ndecl = info.input_map[i];
@@ -141,6 +152,8 @@ NineVertexShader9_dtor( struct NineVertexShader9 *This )
     }
     nine_shader_variants_free(&This->variant);
     nine_shader_variants_so_free(&This->variant_so);
+
+    nine_shader_constant_combination_free(This->c_combinations);
 
     FREE((void *)This->byte_code.tokens); /* const_cast */
 
@@ -195,6 +208,10 @@ NineVertexShader9_GetVariant( struct NineVertexShader9 *This )
         info.fog_enable = device->context.rs[D3DRS_FOGENABLE];
         info.point_size_min = asfloat(device->context.rs[D3DRS_POINTSIZE_MIN]);
         info.point_size_max = asfloat(device->context.rs[D3DRS_POINTSIZE_MAX]);
+        info.add_constants_defs.c_combination =
+            nine_shader_constant_combination_get(This->c_combinations, (key >> 16) & 0xff);
+        info.add_constants_defs.int_const_added = &This->int_slots_used;
+        info.add_constants_defs.bool_const_added = &This->bool_slots_used;
         info.swvp_on = device->context.swvp;
         info.process_vertices = false;
 
@@ -232,6 +249,9 @@ NineVertexShader9_GetVariantProcessVertices( struct NineVertexShader9 *This,
     info.fog_enable = false;
     info.point_size_min = 0;
     info.point_size_max = 0;
+    info.add_constants_defs.c_combination = NULL;
+    info.add_constants_defs.int_const_added = NULL;
+    info.add_constants_defs.bool_const_added = NULL;
     info.swvp_on = true;
     info.vdecl_out = vdecl_out;
     info.process_vertices = true;

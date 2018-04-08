@@ -1595,7 +1595,7 @@ CSMT_ITEM_NO_WAIT(nine_context_set_vertex_shader_constant_i,
     }
 
     context->changed.vs_const_i = TRUE;
-    context->changed.group |= NINE_STATE_VS_CONST;
+    context->changed.group |= NINE_STATE_VS_CONST | NINE_STATE_VS_PARAMS_MISC;
 }
 
 CSMT_ITEM_NO_WAIT(nine_context_set_vertex_shader_constant_b,
@@ -1614,7 +1614,7 @@ CSMT_ITEM_NO_WAIT(nine_context_set_vertex_shader_constant_b,
         context->vs_const_b[StartRegister + i] = pConstantData[i] ? bool_true : 0;
 
     context->changed.vs_const_b = TRUE;
-    context->changed.group |= NINE_STATE_VS_CONST;
+    context->changed.group |= NINE_STATE_VS_CONST | NINE_STATE_VS_PARAMS_MISC;
 }
 
 CSMT_ITEM_NO_WAIT(nine_context_set_pixel_shader,
@@ -1669,7 +1669,7 @@ CSMT_ITEM_NO_WAIT(nine_context_set_pixel_shader_constant_i_transformed,
            Vector4iCount * sizeof(context->ps_const_i[0]));
 
     context->changed.ps_const_i = TRUE;
-    context->changed.group |= NINE_STATE_PS_CONST;
+    context->changed.group |= NINE_STATE_PS_CONST | NINE_STATE_PS_PARAMS_MISC;
 }
 
 CSMT_ITEM_NO_WAIT(nine_context_set_pixel_shader_constant_i,
@@ -1694,7 +1694,7 @@ CSMT_ITEM_NO_WAIT(nine_context_set_pixel_shader_constant_i,
         }
     }
     context->changed.ps_const_i = TRUE;
-    context->changed.group |= NINE_STATE_PS_CONST;
+    context->changed.group |= NINE_STATE_PS_CONST | NINE_STATE_PS_PARAMS_MISC;
 }
 
 CSMT_ITEM_NO_WAIT(nine_context_set_pixel_shader_constant_b,
@@ -1713,7 +1713,7 @@ CSMT_ITEM_NO_WAIT(nine_context_set_pixel_shader_constant_b,
         context->ps_const_b[StartRegister + i] = pConstantData[i] ? bool_true : 0;
 
     context->changed.ps_const_b = TRUE;
-    context->changed.group |= NINE_STATE_PS_CONST;
+    context->changed.group |= NINE_STATE_PS_CONST | NINE_STATE_PS_PARAMS_MISC;
 }
 
 /* XXX: use resource, as resource might change */

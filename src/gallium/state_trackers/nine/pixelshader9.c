@@ -178,13 +178,24 @@ NinePixelShader9_GetVariant( struct NinePixelShader9 *This )
         info.const_b_base = NINE_CONST_B_BASE(device->max_ps_const_f) / 16;
         info.byte_code = This->byte_code.tokens;
         info.sampler_mask_shadow = key & 0xffff;
-        info.sampler_ps1xtypes = (key >> 16) & 0xffff;
+        /* intended overlap with sampler_mask_shadow */
+        if (unlikely(This->byte_code.version < 0x20)) {
+            if (This->byte_code.version < 0x14) {
+                info.sampler_ps1xtypes = (key >> 4) & 0xff;
+                info.projected = (key >> 12) & 0xff;
+            } else {
+                info.sampler_ps1xtypes = (key >> 6) & 0xfff;
+                info.projected = 0;
+            }
+        } else {
+            info.sampler_ps1xtypes = 0;
+            info.projected = 0;
+        }
         info.fog_enable = device->context.rs[D3DRS_FOGENABLE];
         info.fog_mode = device->context.rs[D3DRS_FOGTABLEMODE];
-        info.force_color_in_centroid = key >> 34 & 1;
-        info.projected = (key >> 48) & 0xffff;
+        info.force_color_in_centroid = (key >> 22) & 1;
         info.add_constants_defs.c_combination =
-            nine_shader_constant_combination_get(This->c_combinations, (key >> 40) & 0xff);
+            nine_shader_constant_combination_get(This->c_combinations, (key >> 24) & 0xff);
         info.add_constants_defs.int_const_added = &This->int_slots_used;
         info.add_constants_defs.bool_const_added = &This->bool_slots_used;
         info.process_vertices = false;

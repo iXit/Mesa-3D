@@ -1819,7 +1819,7 @@ nine_ff_get_ps(struct NineDevice9 *device)
     if (s >= 1)
         key.ts[s-1].resultarg = 0;
 
-    key.projected = nine_ff_get_projected_key(context);
+    key.projected = nine_ff_get_projected_key_ff(context);
     key.specular = !!context->rs[D3DRS_SPECULARENABLE];
 
     for (; s < 8; ++s)

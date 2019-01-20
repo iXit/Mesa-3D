@@ -993,7 +993,7 @@ tx_src_param(struct shader_translator *tx, const struct sm1_src_param *param)
     case D3DSPR_SAMPLER:
         assert(param->mod == NINED3DSPSM_NONE);
         assert(param->swizzle == NINED3DSP_NOSWIZZLE);
-        src = ureg_src_register(TGSI_FILE_SAMPLER, param->idx);
+        src = ureg_DECL_sampler(ureg, param->idx);
         break;
     case D3DSPR_CONST:
         if (param->rel || !tx_lconstf(tx, &src, param->idx)) {

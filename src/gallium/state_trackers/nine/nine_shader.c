@@ -508,6 +508,8 @@ struct shader_translator
     struct sm1_local_const *lconstb;
     unsigned num_lconstb;
 
+    boolean slots_used[NINE_MAX_CONST_ALL];
+
     boolean indirect_const_access;
     boolean failure;
 
@@ -567,6 +569,8 @@ static struct ureg_src nine_float_constant_src(struct shader_translator *tx, int
         src = ureg_src_dimension(src, 0);
     }
 
+    if (!tx->info->swvp_on)
+        tx->slots_used[idx] = TRUE;
     if (tx->info->const_float_slots < (idx + 1))
         tx->info->const_float_slots = idx + 1;
 
@@ -585,8 +589,10 @@ static struct ureg_src nine_integer_constant_src(struct shader_translator *tx, i
         src = ureg_src_dimension(src, 0);
     }
 
-    if (!tx->info->swvp_on)
+    if (!tx->info->swvp_on) {
+        tx->slots_used[tx->info->const_i_base + idx] = TRUE;
         tx->info->int_slots_used[idx] = TRUE;
+    }
     if (tx->info->const_int_slots < (idx + 1))
         tx->info->const_int_slots = idx + 1;
 
@@ -609,8 +615,10 @@ static struct ureg_src nine_boolean_constant_src(struct shader_translator *tx, i
     }
     src = ureg_swizzle(src, s, s, s, s);
 
-    if (!tx->info->swvp_on)
+    if (!tx->info->swvp_on) {
+        tx->slots_used[tx->info->const_b_base + r] = TRUE;
         tx->info->bool_slots_used[idx] = TRUE;
+    }
     if (tx->info->const_bool_slots < (idx + 1))
         tx->info->const_bool_slots = idx + 1;
 
@@ -3517,6 +3525,7 @@ tx_ctor(struct shader_translator *tx, struct pipe_screen *screen, struct nine_sh
     info->position_t = FALSE;
     info->point_size = FALSE;
 
+    memset(tx->slots_used, 0, sizeof(tx->slots_used));
     memset(info->int_slots_used, 0, sizeof(info->int_slots_used));
     memset(info->bool_slots_used, 0, sizeof(info->bool_slots_used));
 

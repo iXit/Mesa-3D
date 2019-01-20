@@ -509,6 +509,7 @@ struct shader_translator
     unsigned num_lconstb;
 
     boolean slots_used[NINE_MAX_CONST_ALL];
+    unsigned *slot_map;
     unsigned num_slots;
 
     boolean indirect_const_access;
@@ -556,6 +557,9 @@ nine_record_outputs(struct shader_translator *tx, BYTE Usage, BYTE UsageIndex,
 static struct ureg_src nine_float_constant_src(struct shader_translator *tx, int idx)
 {
     struct ureg_src src;
+
+    if (tx->slot_map)
+        idx = tx->slot_map[idx];
     /* vswp constant handling: we use two buffers
      * to fit all the float constants. The special handling
      * doesn't need to be elsewhere, because all the instructions
@@ -589,6 +593,8 @@ static struct ureg_src nine_integer_constant_src(struct shader_translator *tx, i
         src = ureg_src_dimension(src, 2);
     } else {
         unsigned slot_idx = tx->info->const_i_base + idx;
+        if (tx->slot_map)
+            slot_idx = tx->slot_map[slot_idx];
         src = ureg_src_register(TGSI_FILE_CONSTANT, slot_idx);
         src = ureg_src_dimension(src, 0);
         tx->slots_used[slot_idx] = TRUE;
@@ -615,6 +621,8 @@ static struct ureg_src nine_boolean_constant_src(struct shader_translator *tx, i
         src = ureg_src_dimension(src, 3);
     } else {
         unsigned slot_idx = tx->info->const_b_base + r;
+        if (tx->slot_map)
+            slot_idx = tx->slot_map[slot_idx];
         src = ureg_src_register(TGSI_FILE_CONSTANT, slot_idx);
         src = ureg_src_dimension(src, 0);
         tx->slots_used[slot_idx] = TRUE;
@@ -3656,6 +3664,8 @@ tx_ctor(struct shader_translator *tx, struct pipe_screen *screen, struct nine_sh
 static void
 tx_dtor(struct shader_translator *tx)
 {
+    if (tx->slot_map)
+        FREE(tx->slot_map);
     if (tx->num_inst_labels)
         FREE(tx->inst_labels);
     FREE(tx->lconstf);
@@ -3736,54 +3746,16 @@ shader_add_ps_fog_stage(struct shader_translator *tx, struct ureg_src src_col)
     ureg_MOV(ureg, ureg_writemask(oCol0, TGSI_WRITEMASK_W), src_col);
 }
 
-HRESULT
-nine_translate_shader(struct NineDevice9 *device, struct nine_shader_info *info, struct pipe_context *pipe)
+static void parse_shader(struct shader_translator *tx)
 {
-    struct shader_translator *tx;
-    HRESULT hr = D3D_OK;
-    const unsigned processor = info->type;
-    struct pipe_screen *screen = info->process_vertices ? device->screen_sw : device->screen;
-
-    user_assert(processor != ~0, D3DERR_INVALIDCALL);
-
-    tx = MALLOC_STRUCT(shader_translator);
-    if (!tx)
-        return E_OUTOFMEMORY;
-
-    if (tx_ctor(tx, screen, info) == E_OUTOFMEMORY) {
-        hr = E_OUTOFMEMORY;
-        goto out;
-    }
-
-    assert(IS_VS || !info->swvp_on);
-
-    if (((tx->version.major << 16) | tx->version.minor) > 0x00030000) {
-        hr = D3DERR_INVALIDCALL;
-        DBG("Unsupported shader version: %u.%u !\n",
-            tx->version.major, tx->version.minor);
-        goto out;
-    }
-    if (tx->processor != processor) {
-        hr = D3DERR_INVALIDCALL;
-        DBG("Shader type mismatch: %u / %u !\n", tx->processor, processor);
-        goto out;
-    }
-    DUMP("%s%u.%u\n", processor == PIPE_SHADER_VERTEX ? "VS" : "PS",
-         tx->version.major, tx->version.minor);
+    struct nine_shader_info *info = tx->info;
 
     while (!sm1_parse_eof(tx) && !tx->failure)
         sm1_parse_instruction(tx);
     tx->parse++; /* for byte_size */
 
-    if (tx->failure) {
-        /* For VS shaders, we print the warning later,
-         * we first try with swvp. */
-        if (IS_PS)
-            ERR("Encountered buggy shader\n");
-        ureg_destroy(tx->ureg);
-        hr = D3DERR_INVALIDCALL;
-        goto out;
-    }
+    if (tx->failure)
+        return;
 
     if (IS_PS && tx->version.major < 3) {
         if (tx->version.major < 2) {
@@ -3814,6 +3786,118 @@ nine_translate_shader(struct NineDevice9 *device, struct nine_shader_info *info,
         shader_add_vs_viewport_transform(tx);
 
     ureg_END(tx->ureg);
+}
+
+HRESULT
+nine_translate_shader(struct NineDevice9 *device, struct nine_shader_info *info, struct pipe_context *pipe)
+{
+    struct shader_translator *tx;
+    HRESULT hr = D3D_OK;
+    const unsigned processor = info->type;
+    struct pipe_screen *screen = info->process_vertices ? device->screen_sw : device->screen;
+    unsigned *const_ranges = NULL;
+
+    user_assert(processor != ~0, D3DERR_INVALIDCALL);
+
+    tx = MALLOC_STRUCT(shader_translator);
+    if (!tx)
+        return E_OUTOFMEMORY;
+
+    if (tx_ctor(tx, screen, info) == E_OUTOFMEMORY) {
+        hr = E_OUTOFMEMORY;
+        goto out;
+    }
+
+    assert(IS_VS || !info->swvp_on);
+
+    if (((tx->version.major << 16) | tx->version.minor) > 0x00030000) {
+        hr = D3DERR_INVALIDCALL;
+        DBG("Unsupported shader version: %u.%u !\n",
+            tx->version.major, tx->version.minor);
+        goto out;
+    }
+    if (tx->processor != processor) {
+        hr = D3DERR_INVALIDCALL;
+        DBG("Shader type mismatch: %u / %u !\n", tx->processor, processor);
+        goto out;
+    }
+    DUMP("%s%u.%u\n", processor == PIPE_SHADER_VERTEX ? "VS" : "PS",
+         tx->version.major, tx->version.minor);
+
+    parse_shader(tx);
+
+    if (tx->failure) {
+        /* For VS shaders, we print the warning later,
+         * we first try with swvp. */
+        if (IS_PS)
+            ERR("Encountered buggy shader\n");
+        ureg_destroy(tx->ureg);
+        hr = D3DERR_INVALIDCALL;
+        goto out;
+    }
+
+    /* Recompile after compacting constant slots if possible */
+    if (!tx->indirect_const_access && !info->swvp_on && tx->num_slots > 0 && 0) {
+        unsigned *slot_map;
+        unsigned c;
+        int i, j, num_ranges, prev;
+
+        DBG("Recompiling shader for constant compaction\n");
+        ureg_destroy(tx->ureg);
+
+        if (tx->num_inst_labels)
+            FREE(tx->inst_labels);
+        FREE(tx->lconstf);
+        FREE(tx->regs.r);
+
+        num_ranges = 0;
+        prev = -2;
+        for (i = 0; i < NINE_MAX_CONST_ALL; i++) {
+            if (tx->slots_used[i]) {
+                if (prev != i - 1)
+                    num_ranges++;
+                prev = i;
+            }
+        }
+        slot_map = MALLOC(NINE_MAX_CONST_ALL * sizeof(unsigned));
+        const_ranges = CALLOC(num_ranges + 1, 2 * sizeof(unsigned)); /* ranges stop when last is of size 0 */
+        if (!slot_map || !const_ranges) {
+            hr = E_OUTOFMEMORY;
+            goto out;
+        }
+        c = 0;
+        j = -1;
+        prev = -2;
+        for (i = 0; i < NINE_MAX_CONST_ALL; i++) {
+            if (tx->slots_used[i]) {
+                if (prev != i - 1)
+                    j++;
+                /* Initialize first slot of the range */
+                if (!const_ranges[2*j+1])
+                    const_ranges[2*j] = i;
+                const_ranges[2*j+1]++;
+                prev = i;
+                slot_map[i] = c++;
+            }
+        }
+
+        if (tx_ctor(tx, screen, info) == E_OUTOFMEMORY) {
+            hr = E_OUTOFMEMORY;
+            goto out;
+        }
+        tx->slot_map = slot_map;
+        parse_shader(tx);
+        assert(!tx->failure);
+#if !defined(NDEBUG)
+        i = 0;
+        j = 0;
+        while (const_ranges[i*2+1] != 0) {
+            j += const_ranges[i*2+1];
+            i++;
+        }
+        assert(j == tx->num_slots);
+#endif
+    }
 
     /* record local constants */
     if (tx->num_lconstf && tx->indirect_const_access) {
@@ -3920,8 +4004,12 @@ nine_translate_shader(struct NineDevice9 *device, struct nine_shader_info *info,
         goto out;
     }
 
+    info->const_ranges = const_ranges;
+    const_ranges = NULL;
     info->byte_size = (tx->parse - tx->byte_code) * sizeof(DWORD);
 out:
+    if (const_ranges)
+        FREE(const_ranges);
     tx_dtor(tx);
     return hr;
 }

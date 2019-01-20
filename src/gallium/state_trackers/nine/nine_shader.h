@@ -82,6 +82,8 @@ struct nine_shader_info
     unsigned const_int_slots;
     unsigned const_bool_slots;
 
+    unsigned *const_ranges;
+
     struct nine_lconstf lconstf; /* out, NOTE: members to be free'd by user */
     uint8_t bumpenvmat_needed;
 

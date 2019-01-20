@@ -3493,10 +3493,17 @@ sm1_parse_instruction(struct shader_translator *tx)
     TOKEN_JUMP(tx);
 }
 
-static void
-tx_ctor(struct shader_translator *tx, struct nine_shader_info *info)
+#define GET_CAP(n) screen->get_param( \
+      screen, PIPE_CAP_##n)
+#define GET_SHADER_CAP(n) screen->get_shader_param( \
+      screen, info->type, PIPE_SHADER_CAP_##n)
+
+static HRESULT
+tx_ctor(struct shader_translator *tx, struct pipe_screen *screen, struct nine_shader_info *info)
 {
     unsigned i;
+
+    memset(tx, 0, sizeof(*tx));
 
     tx->info = info;
 
@@ -3550,6 +3557,86 @@ tx_ctor(struct shader_translator *tx, struct nine_shader_info *info)
     tx->num_outputs = 0;
 
     create_op_info_map(tx);
+
+    tx->ureg = ureg_create(info->type);
+    if (!tx->ureg) {
+        return E_OUTOFMEMORY;
+    }
+
+    tx->native_integers = GET_SHADER_CAP(INTEGERS);
+    tx->inline_subroutines = !GET_SHADER_CAP(SUBROUTINES);
+    tx->want_texcoord = GET_CAP(TGSI_TEXCOORD);
+    tx->shift_wpos = !GET_CAP(TGSI_FS_COORD_PIXEL_CENTER_INTEGER);
+    tx->texcoord_sn = tx->want_texcoord ?
+        TGSI_SEMANTIC_TEXCOORD : TGSI_SEMANTIC_GENERIC;
+    tx->wpos_is_sysval = GET_CAP(TGSI_FS_POSITION_IS_SYSVAL);
+    tx->face_is_sysval_integer = GET_CAP(TGSI_FS_FACE_IS_INTEGER_SYSVAL);
+
+    if (IS_VS) {
+        tx->num_constf_allowed = NINE_MAX_CONST_F;
+    } else if (tx->version.major < 2) {/* IS_PS v1 */
+        tx->num_constf_allowed = 8;
+    } else if (tx->version.major == 2) {/* IS_PS v2 */
+        tx->num_constf_allowed = 32;
+    } else {/* IS_PS v3 */
+        tx->num_constf_allowed = NINE_MAX_CONST_F_PS3;
+    }
+
+    if (tx->version.major < 2) {
+        tx->num_consti_allowed = 0;
+        tx->num_constb_allowed = 0;
+    } else {
+        tx->num_consti_allowed = NINE_MAX_CONST_I;
+        tx->num_constb_allowed = NINE_MAX_CONST_B;
+    }
+
+    if (info->swvp_on && tx->version.major >= 2) {
+        tx->num_constf_allowed = 8192;
+        tx->num_consti_allowed = 2048;
+        tx->num_constb_allowed = 2048;
+    }
+
+    /* VS must always write position. Declare it here to make it the 1st output.
+     * (Some drivers like nv50 are buggy and rely on that.)
+     */
+    if (IS_VS) {
+        tx->regs.oPos = ureg_DECL_output(tx->ureg, TGSI_SEMANTIC_POSITION, 0);
+    } else {
+        ureg_property(tx->ureg, TGSI_PROPERTY_FS_COORD_ORIGIN, TGSI_FS_COORD_ORIGIN_UPPER_LEFT);
+        if (!tx->shift_wpos)
+            ureg_property(tx->ureg, TGSI_PROPERTY_FS_COORD_PIXEL_CENTER, TGSI_FS_COORD_PIXEL_CENTER_INTEGER);
+    }
+
+    tx->mul_zero_wins = GET_CAP(TGSI_MUL_ZERO_WINS);
+    if (tx->mul_zero_wins)
+       ureg_property(tx->ureg, TGSI_PROPERTY_MUL_ZERO_WINS, 1);
+
+    /* Add additional definition of constants */
+    if (info->add_constants_defs.c_combination) {
+        unsigned i;
+
+        assert(info->add_constants_defs.int_const_added);
+        assert(info->add_constants_defs.bool_const_added);
+        /* We only add constants that are used by the shader
+         * and that are not defined in the shader */
+        for (i = 0; i < NINE_MAX_CONST_I; ++i) {
+            if ((*info->add_constants_defs.int_const_added)[i]) {
+                DBG("Defining const i%i : { %i %i %i %i }\n", i,
+                    info->add_constants_defs.c_combination->const_i[i][0],
+                    info->add_constants_defs.c_combination->const_i[i][1],
+                    info->add_constants_defs.c_combination->const_i[i][2],
+                    info->add_constants_defs.c_combination->const_i[i][3]);
+                tx_set_lconsti(tx, i, info->add_constants_defs.c_combination->const_i[i]);
+            }
+        }
+        for (i = 0; i < NINE_MAX_CONST_B; ++i) {
+            if ((*info->add_constants_defs.bool_const_added)[i]) {
+                DBG("Defining const b%i : %i\n", i, (int)(info->add_constants_defs.c_combination->const_b[i] != 0));
+                tx_set_lconstb(tx, i, info->add_constants_defs.c_combination->const_b[i]);
+            }
+        }
+    }
+    return D3D_OK;
 }
 
 static void
@@ -3635,11 +3722,6 @@ shader_add_ps_fog_stage(struct shader_translator *tx, struct ureg_src src_col)
     ureg_MOV(ureg, ureg_writemask(oCol0, TGSI_WRITEMASK_W), src_col);
 }
 
-#define GET_CAP(n) screen->get_param( \
-      screen, PIPE_CAP_##n)
-#define GET_SHADER_CAP(n) screen->get_shader_param( \
-      screen, info->type, PIPE_SHADER_CAP_##n)
-
 HRESULT
 nine_translate_shader(struct NineDevice9 *device, struct nine_shader_info *info, struct pipe_context *pipe)
 {
@@ -3650,10 +3732,14 @@ nine_translate_shader(struct NineDevice9 *device, struct nine_shader_info *info,
 
     user_assert(processor != ~0, D3DERR_INVALIDCALL);
 
-    tx = CALLOC_STRUCT(shader_translator);
+    tx = MALLOC_STRUCT(shader_translator);
     if (!tx)
         return E_OUTOFMEMORY;
-    tx_ctor(tx, info);
+
+    if (tx_ctor(tx, screen, info) == E_OUTOFMEMORY) {
+        hr = E_OUTOFMEMORY;
+        goto out;
+    }
 
     assert(IS_VS || !info->swvp_on);
 
@@ -3670,86 +3756,6 @@ nine_translate_shader(struct NineDevice9 *device, struct nine_shader_info *info,
     }
     DUMP("%s%u.%u\n", processor == PIPE_SHADER_VERTEX ? "VS" : "PS",
          tx->version.major, tx->version.minor);
-
-    tx->ureg = ureg_create(processor);
-    if (!tx->ureg) {
-        hr = E_OUTOFMEMORY;
-        goto out;
-    }
-
-    tx->native_integers = GET_SHADER_CAP(INTEGERS);
-    tx->inline_subroutines = !GET_SHADER_CAP(SUBROUTINES);
-    tx->want_texcoord = GET_CAP(TGSI_TEXCOORD);
-    tx->shift_wpos = !GET_CAP(TGSI_FS_COORD_PIXEL_CENTER_INTEGER);
-    tx->texcoord_sn = tx->want_texcoord ?
-        TGSI_SEMANTIC_TEXCOORD : TGSI_SEMANTIC_GENERIC;
-    tx->wpos_is_sysval = GET_CAP(TGSI_FS_POSITION_IS_SYSVAL);
-    tx->face_is_sysval_integer = GET_CAP(TGSI_FS_FACE_IS_INTEGER_SYSVAL);
-
-    if (IS_VS) {
-        tx->num_constf_allowed = NINE_MAX_CONST_F;
-    } else if (tx->version.major < 2) {/* IS_PS v1 */
-        tx->num_constf_allowed = 8;
-    } else if (tx->version.major == 2) {/* IS_PS v2 */
-        tx->num_constf_allowed = 32;
-    } else {/* IS_PS v3 */
-        tx->num_constf_allowed = NINE_MAX_CONST_F_PS3;
-    }
-
-    if (tx->version.major < 2) {
-        tx->num_consti_allowed = 0;
-        tx->num_constb_allowed = 0;
-    } else {
-        tx->num_consti_allowed = NINE_MAX_CONST_I;
-        tx->num_constb_allowed = NINE_MAX_CONST_B;
-    }
-
-    if (info->swvp_on && tx->version.major >= 2) {
-        tx->num_constf_allowed = 8192;
-        tx->num_consti_allowed = 2048;
-        tx->num_constb_allowed = 2048;
-    }
-
-    /* VS must always write position. Declare it here to make it the 1st output.
-     * (Some drivers like nv50 are buggy and rely on that.)
-     */
-    if (IS_VS) {
-        tx->regs.oPos = ureg_DECL_output(tx->ureg, TGSI_SEMANTIC_POSITION, 0);
-    } else {
-        ureg_property(tx->ureg, TGSI_PROPERTY_FS_COORD_ORIGIN, TGSI_FS_COORD_ORIGIN_UPPER_LEFT);
-        if (!tx->shift_wpos)
-            ureg_property(tx->ureg, TGSI_PROPERTY_FS_COORD_PIXEL_CENTER, TGSI_FS_COORD_PIXEL_CENTER_INTEGER);
-    }
-
-    tx->mul_zero_wins = GET_CAP(TGSI_MUL_ZERO_WINS);
-    if (tx->mul_zero_wins)
-       ureg_property(tx->ureg, TGSI_PROPERTY_MUL_ZERO_WINS, 1);
-
-    /* Add additional definition of constants */
-    if (info->add_constants_defs.c_combination) {
-        unsigned i;
-
-        assert(info->add_constants_defs.int_const_added);
-        assert(info->add_constants_defs.bool_const_added);
-        /* We only add constants that are used by the shader
-         * and that are not defined in the shader */
-        for (i = 0; i < NINE_MAX_CONST_I; ++i) {
-            if ((*info->add_constants_defs.int_const_added)[i]) {
-                DBG("Defining const i%i : { %i %i %i %i }\n", i,
-                    info->add_constants_defs.c_combination->const_i[i][0],
-                    info->add_constants_defs.c_combination->const_i[i][1],
-                    info->add_constants_defs.c_combination->const_i[i][2],
-                    info->add_constants_defs.c_combination->const_i[i][3]);
-                tx_set_lconsti(tx, i, info->add_constants_defs.c_combination->const_i[i]);
-            }
-        }
-        for (i = 0; i < NINE_MAX_CONST_B; ++i) {
-            if ((*info->add_constants_defs.bool_const_added)[i]) {
-                DBG("Defining const b%i : %i\n", i, (int)(info->add_constants_defs.c_combination->const_b[i] != 0));
-                tx_set_lconstb(tx, i, info->add_constants_defs.c_combination->const_b[i]);
-            }
-        }
-    }
 
     while (!sm1_parse_eof(tx) && !tx->failure)
         sm1_parse_instruction(tx);

@@ -558,7 +558,7 @@ static struct ureg_src nine_float_constant_src(struct shader_translator *tx, int
      * doesn't need to be elsewhere, because all the instructions
      * accessing the constants directly are VS1, and swvp
      * is VS >= 2 */
-    if (IS_VS && tx->info->swvp_on && idx >= 4096) {
+    if (tx->info->swvp_on && idx >= 4096) {
         /* TODO: swvp rel is broken if many constants are used */
         src = ureg_src_register(TGSI_FILE_CONSTANT, idx - 4096);
         src = ureg_src_dimension(src, 1);
@@ -577,7 +577,7 @@ static struct ureg_src nine_integer_constant_src(struct shader_translator *tx, i
 {
     struct ureg_src src;
 
-    if (IS_VS && tx->info->swvp_on) {
+    if (tx->info->swvp_on) {
         src = ureg_src_register(TGSI_FILE_CONSTANT, idx);
         src = ureg_src_dimension(src, 2);
     } else {
@@ -600,7 +600,7 @@ static struct ureg_src nine_boolean_constant_src(struct shader_translator *tx, i
     char r = idx / 4;
     char s = idx & 3;
 
-    if (IS_VS && tx->info->swvp_on) {
+    if (tx->info->swvp_on) {
         src = ureg_src_register(TGSI_FILE_CONSTANT, r);
         src = ureg_src_dimension(src, 3);
     } else {
@@ -3655,6 +3655,8 @@ nine_translate_shader(struct NineDevice9 *device, struct nine_shader_info *info,
         return E_OUTOFMEMORY;
     tx_ctor(tx, info);
 
+    assert(IS_VS || !info->swvp_on);
+
     if (((tx->version.major << 16) | tx->version.minor) > 0x00030000) {
         hr = D3DERR_INVALIDCALL;
         DBG("Unsupported shader version: %u.%u !\n",
@@ -3702,7 +3704,7 @@ nine_translate_shader(struct NineDevice9 *device, struct nine_shader_info *info,
         tx->num_constb_allowed = NINE_MAX_CONST_B;
     }
 
-    if (IS_VS && tx->version.major >= 2 && info->swvp_on) {
+    if (info->swvp_on && tx->version.major >= 2) {
         tx->num_constf_allowed = 8192;
         tx->num_consti_allowed = 2048;
         tx->num_constb_allowed = 2048;
@@ -3854,14 +3856,14 @@ nine_translate_shader(struct NineDevice9 *device, struct nine_shader_info *info,
     /* r500 */
     if (info->const_float_slots > device->max_vs_const_f &&
         (info->const_int_slots || info->const_bool_slots) &&
-        (!IS_VS || !info->swvp_on))
+        !info->swvp_on)
         ERR("Overlapping constant slots. The shader is likely to be buggy\n");
 
 
     if (tx->indirect_const_access) /* vs only */
         info->const_float_slots = device->max_vs_const_f;
 
-    if (!IS_VS || !info->swvp_on) {
+    if (!info->swvp_on) {
         unsigned s, slot_max;
         unsigned max_const_f = IS_VS ? device->max_vs_const_f : device->max_ps_const_f;
 

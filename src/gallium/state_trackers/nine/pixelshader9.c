@@ -64,6 +64,7 @@ NinePixelShader9_ctor( struct NinePixelShader9 *This,
     info.add_constants_defs.int_const_added = NULL;
     info.add_constants_defs.bool_const_added = NULL;
     info.process_vertices = false;
+    info.swvp_on = false;
 
     pipe = nine_context_get_pipe_acquire(device);
     hr = nine_translate_shader(device, &info, pipe);
@@ -199,6 +200,7 @@ NinePixelShader9_GetVariant( struct NinePixelShader9 *This )
         info.add_constants_defs.int_const_added = &This->int_slots_used;
         info.add_constants_defs.bool_const_added = &This->bool_slots_used;
         info.process_vertices = false;
+        info.swvp_on = false;
 
         hr = nine_translate_shader(This->base.device, &info, pipe);
         if (FAILED(hr))

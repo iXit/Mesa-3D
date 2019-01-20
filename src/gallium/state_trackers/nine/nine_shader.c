@@ -509,6 +509,7 @@ struct shader_translator
     unsigned num_lconstb;
 
     boolean slots_used[NINE_MAX_CONST_ALL];
+    unsigned num_slots;
 
     boolean indirect_const_access;
     boolean failure;
@@ -573,6 +574,8 @@ static struct ureg_src nine_float_constant_src(struct shader_translator *tx, int
         tx->slots_used[idx] = TRUE;
     if (tx->info->const_float_slots < (idx + 1))
         tx->info->const_float_slots = idx + 1;
+    if (tx->num_slots < (idx + 1))
+        tx->num_slots = idx + 1;
 
     return src;
 }
@@ -585,14 +588,15 @@ static struct ureg_src nine_integer_constant_src(struct shader_translator *tx, i
         src = ureg_src_register(TGSI_FILE_CONSTANT, idx);
         src = ureg_src_dimension(src, 2);
     } else {
-        src = ureg_src_register(TGSI_FILE_CONSTANT, tx->info->const_i_base + idx);
+        unsigned slot_idx = tx->info->const_i_base + idx;
+        src = ureg_src_register(TGSI_FILE_CONSTANT, slot_idx);
         src = ureg_src_dimension(src, 0);
+        tx->slots_used[slot_idx] = TRUE;
+        tx->info->int_slots_used[idx] = TRUE;
+        if (tx->num_slots < (slot_idx + 1))
+            tx->num_slots = slot_idx + 1;
     }
 
-    if (!tx->info->swvp_on) {
-        tx->slots_used[tx->info->const_i_base + idx] = TRUE;
-        tx->info->int_slots_used[idx] = TRUE;
-    }
     if (tx->info->const_int_slots < (idx + 1))
         tx->info->const_int_slots = idx + 1;
 
@@ -610,15 +614,16 @@ static struct ureg_src nine_boolean_constant_src(struct shader_translator *tx, i
         src = ureg_src_register(TGSI_FILE_CONSTANT, r);
         src = ureg_src_dimension(src, 3);
     } else {
-        src = ureg_src_register(TGSI_FILE_CONSTANT, tx->info->const_b_base + r);
+        unsigned slot_idx = tx->info->const_b_base + r;
+        src = ureg_src_register(TGSI_FILE_CONSTANT, slot_idx);
         src = ureg_src_dimension(src, 0);
+        tx->slots_used[slot_idx] = TRUE;
+        tx->info->bool_slots_used[idx] = TRUE;
+        if (tx->num_slots < (slot_idx + 1))
+            tx->num_slots = slot_idx + 1;
     }
     src = ureg_swizzle(src, s, s, s, s);
 
-    if (!tx->info->swvp_on) {
-        tx->slots_used[tx->info->const_b_base + r] = TRUE;
-        tx->info->bool_slots_used[idx] = TRUE;
-    }
     if (tx->info->const_bool_slots < (idx + 1))
         tx->info->const_bool_slots = idx + 1;
 
@@ -3875,24 +3880,15 @@ nine_translate_shader(struct NineDevice9 *device, struct nine_shader_info *info,
         ERR("Overlapping constant slots. The shader is likely to be buggy\n");
 
 
-    if (tx->indirect_const_access) /* vs only */
+    if (tx->indirect_const_access) { /* vs only */
         info->const_float_slots = device->max_vs_const_f;
+        tx->num_slots = MAX2(tx->num_slots, device->max_vs_const_f);
+    }
 
     if (!info->swvp_on) {
-        unsigned s, slot_max;
-        unsigned max_const_f = IS_VS ? device->max_vs_const_f : device->max_ps_const_f;
-
-        slot_max = info->const_bool_slots > 0 ?
-                       max_const_f + NINE_MAX_CONST_I
-                       + DIV_ROUND_UP(info->const_bool_slots, 4) :
-                           info->const_int_slots > 0 ?
-                               max_const_f + info->const_int_slots :
-                                   info->const_float_slots;
-
-        info->const_used_size = sizeof(float[4]) * slot_max; /* slots start from 1 */
-
-        for (s = 0; s < slot_max; s++)
-            ureg_DECL_constant(tx->ureg, s);
+        info->const_used_size = sizeof(float[4]) * tx->num_slots;
+        if (tx->num_slots)
+            ureg_DECL_constant2D(tx->ureg, 0, tx->num_slots-1, 0);
     } else {
          ureg_DECL_constant2D(tx->ureg, 0, 4095, 0);
          ureg_DECL_constant2D(tx->ureg, 0, 4095, 1);

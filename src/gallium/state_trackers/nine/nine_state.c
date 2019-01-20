@@ -433,6 +433,7 @@ static void
 prepare_vs_constants_userbuf(struct NineDevice9 *device)
 {
     struct nine_context *context = &device->context;
+    uint8_t *upload_ptr = NULL;
     struct pipe_constant_buffer cb;
     cb.buffer = NULL;
     cb.buffer_offset = 0;
@@ -478,6 +479,30 @@ prepare_vs_constants_userbuf(struct NineDevice9 *device)
         cb.user_buffer = dst;
     }
 
+    /* Note: We probably don't want to do separate memcpy to
+     * upload_ptr directly, if we have to copy some constants
+     * at random locations (context->vs->lconstf.ranges),
+     * to have efficient WC. Thus for this case we really want
+     * that intermediate buffer. */
+
+    u_upload_alloc(context->pipe->const_uploader,
+                  0,
+                  cb.buffer_size,
+                  256, /* Be conservative about alignment */
+                  &(cb.buffer_offset),
+                  &(cb.buffer),
+                  (void**)&upload_ptr);
+
+    assert(cb.buffer && upload_ptr);
+
+    memcpy(upload_ptr, cb.user_buffer, cb.buffer_size);
+
+    u_upload_unmap(context->pipe->const_uploader);
+    cb.user_buffer = NULL;
+
+    /* Free previous resource */
+    pipe_resource_reference(&context->pipe_data.cb_vs.buffer, NULL);
+
     context->pipe_data.cb_vs = cb;
     context->changed.vs_const_f = 0;
 
@@ -489,6 +514,7 @@ static void
 prepare_ps_constants_userbuf(struct NineDevice9 *device)
 {
     struct nine_context *context = &device->context;
+    uint8_t *upload_ptr = NULL;
     struct pipe_constant_buffer cb;
     cb.buffer = NULL;
     cb.buffer_offset = 0;
@@ -535,6 +561,24 @@ prepare_ps_constants_userbuf(struct NineDevice9 *device)
 
     if (!cb.buffer_size)
         return;
+
+    u_upload_alloc(context->pipe->const_uploader,
+                  0,
+                  cb.buffer_size,
+                  256, /* Be conservative about alignment */
+                  &(cb.buffer_offset),
+                  &(cb.buffer),
+                  (void**)&upload_ptr);
+
+    assert(cb.buffer && upload_ptr);
+
+    memcpy(upload_ptr, cb.user_buffer, cb.buffer_size);
+
+    u_upload_unmap(context->pipe->const_uploader);
+    cb.user_buffer = NULL;
+
+    /* Free previous resource */
+    pipe_resource_reference(&context->pipe_data.cb_ps.buffer, NULL);
 
     context->pipe_data.cb_ps = cb;
     context->changed.ps_const_f = 0;
@@ -2849,6 +2893,8 @@ nine_context_clear(struct NineDevice9 *device)
     for (i = 0; i < PIPE_MAX_ATTRIBS; ++i)
         pipe_vertex_buffer_unreference(&context->vtxbuf[i]);
     pipe_resource_reference(&context->idxbuf, NULL);
+    pipe_resource_reference(&context->pipe_data.cb_vs.buffer, NULL);
+    pipe_resource_reference(&context->pipe_data.cb_ps.buffer, NULL);
 
     for (i = 0; i < NINE_MAX_SAMPLERS; ++i) {
         context->texture[i].enabled = FALSE;

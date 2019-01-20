@@ -106,29 +106,6 @@ struct nine_vs_output_info
     int output_index;
 };
 
-static inline void
-nine_info_mark_const_f_used(struct nine_shader_info *info, int idx)
-{
-    if (info->const_float_slots < (idx + 1))
-        info->const_float_slots = idx + 1;
-}
-static inline void
-nine_info_mark_const_i_used(struct nine_shader_info *info, int idx)
-{
-    if (!info->swvp_on)
-        info->int_slots_used[idx] = TRUE;
-    if (info->const_int_slots < (idx + 1))
-        info->const_int_slots = idx + 1;
-}
-static inline void
-nine_info_mark_const_b_used(struct nine_shader_info *info, int idx)
-{
-    if (!info->swvp_on)
-        info->bool_slots_used[idx] = TRUE;
-    if (info->const_bool_slots < (idx + 1))
-        info->const_bool_slots = idx + 1;
-}
-
 HRESULT
 nine_translate_shader(struct NineDevice9 *device,
                       struct nine_shader_info *,

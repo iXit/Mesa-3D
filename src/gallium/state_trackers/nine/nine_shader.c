@@ -90,14 +90,8 @@ static inline const char *d3dsio_to_string(unsigned opcode);
 #define NINE_SWIZZLE4(x,y,z,w) \
    TGSI_SWIZZLE_##x, TGSI_SWIZZLE_##y, TGSI_SWIZZLE_##z, TGSI_SWIZZLE_##w
 
-#define NINE_CONSTANT_SRC(index) \
-   ureg_src_dimension(ureg_src_register(TGSI_FILE_CONSTANT, index), 0)
-
 #define NINE_APPLY_SWIZZLE(src, s) \
    ureg_swizzle(src, NINE_SWIZZLE4(s, s, s, s))
-
-#define NINE_CONSTANT_SRC_SWIZZLE(index, s) \
-   NINE_APPLY_SWIZZLE(NINE_CONSTANT_SRC(index), s)
 
 #define NINED3DSPDM_SATURATE (D3DSPDM_SATURATE >> D3DSP_DSTMOD_SHIFT)
 #define NINED3DSPDM_PARTIALP (D3DSPDM_PARTIALPRECISION >> D3DSP_DSTMOD_SHIFT)
@@ -556,6 +550,73 @@ nine_record_outputs(struct shader_translator *tx, BYTE Usage, BYTE UsageIndex,
     tx->num_outputs++;
 }
 
+static struct ureg_src nine_float_constant_src(struct shader_translator *tx, int idx)
+{
+    struct ureg_src src;
+    /* vswp constant handling: we use two buffers
+     * to fit all the float constants. The special handling
+     * doesn't need to be elsewhere, because all the instructions
+     * accessing the constants directly are VS1, and swvp
+     * is VS >= 2 */
+    if (IS_VS && tx->info->swvp_on && idx >= 4096) {
+        /* TODO: swvp rel is broken if many constants are used */
+        src = ureg_src_register(TGSI_FILE_CONSTANT, idx - 4096);
+        src = ureg_src_dimension(src, 1);
+    } else {
+        src = ureg_src_register(TGSI_FILE_CONSTANT, idx);
+        src = ureg_src_dimension(src, 0);
+    }
+
+    if (tx->info->const_float_slots < (idx + 1))
+        tx->info->const_float_slots = idx + 1;
+
+    return src;
+}
+
+static struct ureg_src nine_integer_constant_src(struct shader_translator *tx, int idx)
+{
+    struct ureg_src src;
+
+    if (IS_VS && tx->info->swvp_on) {
+        src = ureg_src_register(TGSI_FILE_CONSTANT, idx);
+        src = ureg_src_dimension(src, 2);
+    } else {
+        src = ureg_src_register(TGSI_FILE_CONSTANT, tx->info->const_i_base + idx);
+        src = ureg_src_dimension(src, 0);
+    }
+
+    if (!tx->info->swvp_on)
+        tx->info->int_slots_used[idx] = TRUE;
+    if (tx->info->const_int_slots < (idx + 1))
+        tx->info->const_int_slots = idx + 1;
+
+    return src;
+}
+
+static struct ureg_src nine_boolean_constant_src(struct shader_translator *tx, int idx)
+{
+    struct ureg_src src;
+
+    char r = idx / 4;
+    char s = idx & 3;
+
+    if (IS_VS && tx->info->swvp_on) {
+        src = ureg_src_register(TGSI_FILE_CONSTANT, r);
+        src = ureg_src_dimension(src, 3);
+    } else {
+        src = ureg_src_register(TGSI_FILE_CONSTANT, tx->info->const_b_base + r);
+        src = ureg_src_dimension(src, 0);
+    }
+    src = ureg_swizzle(src, s, s, s, s);
+
+    if (!tx->info->swvp_on)
+        tx->info->bool_slots_used[idx] = TRUE;
+    if (tx->info->const_bool_slots < (idx + 1))
+        tx->info->const_bool_slots = idx + 1;
+
+    return src;
+}
+
 static boolean
 tx_lconstf(struct shader_translator *tx, struct ureg_src *src, INT index)
 {
@@ -997,28 +1058,7 @@ tx_src_param(struct shader_translator *tx, const struct sm1_src_param *param)
         break;
     case D3DSPR_CONST:
         if (param->rel || !tx_lconstf(tx, &src, param->idx)) {
-            if (!param->rel)
-                nine_info_mark_const_f_used(tx->info, param->idx);
-            /* vswp constant handling: we use two buffers
-             * to fit all the float constants. The special handling
-             * doesn't need to be elsewhere, because all the instructions
-             * accessing the constants directly are VS1, and swvp
-             * is VS >= 2 */
-            if (IS_VS && tx->info->swvp_on) {
-                if (!param->rel) {
-                    if (param->idx < 4096) {
-                        src = ureg_src_register(TGSI_FILE_CONSTANT, param->idx);
-                        src = ureg_src_dimension(src, 0);
-                    } else {
-                        src = ureg_src_register(TGSI_FILE_CONSTANT, param->idx - 4096);
-                        src = ureg_src_dimension(src, 1);
-                    }
-                } else {
-                    src = ureg_src_register(TGSI_FILE_CONSTANT, param->idx); /* TODO: swvp rel > 4096 */
-                    src = ureg_src_dimension(src, 0);
-                }
-            } else
-                src = NINE_CONSTANT_SRC(param->idx);
+            src = nine_float_constant_src(tx, param->idx);
             if (param->rel) {
                 tx->indirect_const_access = TRUE;
                 src = ureg_src_indirect(src, tx_src_param(tx, param->rel));
@@ -1041,27 +1081,12 @@ tx_src_param(struct shader_translator *tx, const struct sm1_src_param *param)
         break;
     case D3DSPR_CONSTINT:
         /* relative adressing only possible for float constants in vs */
-        if (!tx_lconsti(tx, &src, param->idx)) {
-            nine_info_mark_const_i_used(tx->info, param->idx);
-            if (IS_VS && tx->info->swvp_on) {
-                src = ureg_src_register(TGSI_FILE_CONSTANT, param->idx);
-                src = ureg_src_dimension(src, 2);
-            } else
-                src = NINE_CONSTANT_SRC(tx->info->const_i_base + param->idx);
-        }
+        if (!tx_lconsti(tx, &src, param->idx))
+            src = nine_integer_constant_src(tx, param->idx);
         break;
     case D3DSPR_CONSTBOOL:
-        if (!tx_lconstb(tx, &src, param->idx)) {
-           char r = param->idx / 4;
-           char s = param->idx & 3;
-           nine_info_mark_const_b_used(tx->info, param->idx);
-           if (IS_VS && tx->info->swvp_on) {
-               src = ureg_src_register(TGSI_FILE_CONSTANT, r);
-               src = ureg_src_dimension(src, 3);
-           } else
-               src = NINE_CONSTANT_SRC(tx->info->const_b_base + r);
-           src = ureg_swizzle(src, s, s, s, s);
-        }
+        if (!tx_lconstb(tx, &src, param->idx))
+            src = nine_boolean_constant_src(tx, param->idx);
         break;
     case D3DSPR_LOOP:
         if (ureg_dst_is_undef(tx->regs.address))
@@ -2467,7 +2492,7 @@ DECL_SPECIAL(TEXBEM)
     struct ureg_dst dst = tx_dst_param(tx, &tx->insn.dst[0]);
     struct ureg_src src = tx_src_param(tx, &tx->insn.src[0]); /* t[n] */
     struct ureg_dst tmp, tmp2, texcoord;
-    struct ureg_src sample, m00, m01, m10, m11;
+    struct ureg_src sample, m00, m01, m10, m11, c8m, c16m2;
     struct ureg_src bumpenvlscale, bumpenvloffset;
     const int m = tx->insn.dst[0].idx;
 
@@ -2488,19 +2513,21 @@ DECL_SPECIAL(TEXBEM)
      * 10 is Z
      * 11 is W
      */
-    nine_info_mark_const_f_used(tx->info, 8 + 8 + m/2);
-    m00 = NINE_CONSTANT_SRC_SWIZZLE(8 + m, X);
-    m01 = NINE_CONSTANT_SRC_SWIZZLE(8 + m, Y);
-    m10 = NINE_CONSTANT_SRC_SWIZZLE(8 + m, Z);
-    m11 = NINE_CONSTANT_SRC_SWIZZLE(8 + m, W);
+    c8m = nine_float_constant_src(tx, 8+m);
+    c16m2 = nine_float_constant_src(tx, 8+8+m/2);
+
+    m00 = NINE_APPLY_SWIZZLE(c8m, X);
+    m01 = NINE_APPLY_SWIZZLE(c8m, Y);
+    m10 = NINE_APPLY_SWIZZLE(c8m, Z);
+    m11 = NINE_APPLY_SWIZZLE(c8m, W);
 
     /* These two attributes are packed as X=scale0 Y=offset0 Z=scale1 W=offset1 etc */
     if (m % 2 == 0) {
-        bumpenvlscale = NINE_CONSTANT_SRC_SWIZZLE(8 + 8 + m / 2, X);
-        bumpenvloffset = NINE_CONSTANT_SRC_SWIZZLE(8 + 8 + m / 2, Y);
+        bumpenvlscale = NINE_APPLY_SWIZZLE(c16m2, X);
+        bumpenvloffset = NINE_APPLY_SWIZZLE(c16m2, Y);
     } else {
-        bumpenvlscale = NINE_CONSTANT_SRC_SWIZZLE(8 + 8 + m / 2, Z);
-        bumpenvloffset = NINE_CONSTANT_SRC_SWIZZLE(8 + 8 + m / 2, W);
+        bumpenvlscale = NINE_APPLY_SWIZZLE(c16m2, Z);
+        bumpenvloffset = NINE_APPLY_SWIZZLE(c16m2, W);
     }
 
     apply_ps1x_projection(tx, texcoord, tx->regs.vT[m], m);
@@ -2829,7 +2856,7 @@ DECL_SPECIAL(BEM)
     struct ureg_dst dst = tx_dst_param(tx, &tx->insn.dst[0]);
     struct ureg_src src0 = tx_src_param(tx, &tx->insn.src[0]);
     struct ureg_src src1 = tx_src_param(tx, &tx->insn.src[1]);
-    struct ureg_src m00, m01, m10, m11;
+    struct ureg_src m00, m01, m10, m11, c8m;
     const int m = tx->insn.dst[0].idx;
     struct ureg_dst tmp;
     /*
@@ -2839,11 +2866,11 @@ DECL_SPECIAL(BEM)
      * 10 is Z
      * 11 is W
      */
-    nine_info_mark_const_f_used(tx->info, 8 + m);
-    m00 = NINE_CONSTANT_SRC_SWIZZLE(8 + m, X);
-    m01 = NINE_CONSTANT_SRC_SWIZZLE(8 + m, Y);
-    m10 = NINE_CONSTANT_SRC_SWIZZLE(8 + m, Z);
-    m11 = NINE_CONSTANT_SRC_SWIZZLE(8 + m, W);
+    c8m = nine_float_constant_src(tx, 8+m);
+    m00 = NINE_APPLY_SWIZZLE(c8m, X);
+    m01 = NINE_APPLY_SWIZZLE(c8m, Y);
+    m10 = NINE_APPLY_SWIZZLE(c8m, Z);
+    m11 = NINE_APPLY_SWIZZLE(c8m, W);
     /* dest.r = src0.r + D3DTSS_BUMPENVMAT00(stage n) * src1.r  */
     ureg_MAD(ureg, ureg_writemask(tmp, TGSI_WRITEMASK_X), m00,
              NINE_APPLY_SWIZZLE(src1, X), NINE_APPLY_SWIZZLE(src0, X));
@@ -3541,8 +3568,8 @@ static void
 shader_add_vs_viewport_transform(struct shader_translator *tx)
 {
     struct ureg_program *ureg = tx->ureg;
-    struct ureg_src c0 = NINE_CONSTANT_SRC(0);
-    struct ureg_src c1 = NINE_CONSTANT_SRC(1);
+    struct ureg_src c0 = ureg_src_register(TGSI_FILE_CONSTANT, 0);
+    struct ureg_src c1 = ureg_src_register(TGSI_FILE_CONSTANT, 1);
     /* struct ureg_dst pos_tmp = ureg_DECL_temporary(ureg);*/
 
     c0 = ureg_src_dimension(c0, 4);
@@ -3560,7 +3587,7 @@ shader_add_ps_fog_stage(struct shader_translator *tx, struct ureg_src src_col)
 {
     struct ureg_program *ureg = tx->ureg;
     struct ureg_dst oCol0 = ureg_DECL_output(ureg, TGSI_SEMANTIC_COLOR, 0);
-    struct ureg_src fog_end, fog_coeff, fog_density;
+    struct ureg_src fog_end, fog_coeff, fog_density, fog_params;
     struct ureg_src fog_vs, fog_color;
     struct ureg_dst fog_factor, depth;
 
@@ -3576,22 +3603,22 @@ shader_add_ps_fog_stage(struct shader_translator *tx, struct ureg_src src_col)
         ureg_MUL(ureg, depth, ureg_src(depth), ureg_scalar(nine_get_position_input(tx), TGSI_SWIZZLE_Z));
     }
 
-    nine_info_mark_const_f_used(tx->info, 33);
-    fog_color = NINE_CONSTANT_SRC(32);
+    fog_color = nine_float_constant_src(tx, 32);
+    fog_params = nine_float_constant_src(tx, 33);
     fog_factor = tx_scratch_scalar(tx);
 
     if (tx->info->fog_mode == D3DFOG_LINEAR) {
-        fog_end = NINE_CONSTANT_SRC_SWIZZLE(33, X);
-        fog_coeff = NINE_CONSTANT_SRC_SWIZZLE(33, Y);
+        fog_end = NINE_APPLY_SWIZZLE(fog_params, X);
+        fog_coeff = NINE_APPLY_SWIZZLE(fog_params, Y);
         ureg_ADD(ureg, fog_factor, fog_end, ureg_negate(ureg_src(depth)));
         ureg_MUL(ureg, ureg_saturate(fog_factor), tx_src_scalar(fog_factor), fog_coeff);
     } else if (tx->info->fog_mode == D3DFOG_EXP) {
-        fog_density = NINE_CONSTANT_SRC_SWIZZLE(33, X);
+        fog_density = NINE_APPLY_SWIZZLE(fog_params, X);
         ureg_MUL(ureg, fog_factor, ureg_src(depth), fog_density);
         ureg_MUL(ureg, fog_factor, tx_src_scalar(fog_factor), ureg_imm1f(ureg, -1.442695f));
         ureg_EX2(ureg, fog_factor, tx_src_scalar(fog_factor));
     } else if (tx->info->fog_mode == D3DFOG_EXP2) {
-        fog_density = NINE_CONSTANT_SRC_SWIZZLE(33, X);
+        fog_density = NINE_APPLY_SWIZZLE(fog_params, X);
         ureg_MUL(ureg, fog_factor, ureg_src(depth), fog_density);
         ureg_MUL(ureg, fog_factor, tx_src_scalar(fog_factor), tx_src_scalar(fog_factor));
         ureg_MUL(ureg, fog_factor, tx_src_scalar(fog_factor), ureg_imm1f(ureg, -1.442695f));

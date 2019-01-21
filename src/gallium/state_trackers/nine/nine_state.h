@@ -239,7 +239,9 @@ struct nine_context {
 
     struct {
         void *vs;
+        unsigned *vs_const_ranges;
         void *ps;
+        unsigned *ps_const_ranges;
     } cso_shader;
 
     struct pipe_context *pipe;

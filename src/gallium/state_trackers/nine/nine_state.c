@@ -603,7 +603,7 @@ prepare_vs(struct NineDevice9 *device, uint8_t shader_changed)
 
     /* likely because we dislike FF */
     if (likely(context->programmable_vs)) {
-        context->cso_shader.vs = NineVertexShader9_GetVariant(vs);
+        context->cso_shader.vs = NineVertexShader9_GetVariant(vs, &context->cso_shader.vs_const_ranges);
     } else {
         vs = device->ff.vs;
         context->cso_shader.vs = vs->ff_cso;
@@ -637,7 +637,7 @@ prepare_ps(struct NineDevice9 *device, uint8_t shader_changed)
         return 0;
 
     if (likely(ps)) {
-        context->cso_shader.ps = NinePixelShader9_GetVariant(ps);
+        context->cso_shader.ps = NinePixelShader9_GetVariant(ps, &context->cso_shader.ps_const_ranges);
     } else {
         ps = device->ff.ps;
         context->cso_shader.ps = ps->ff_cso;

@@ -62,6 +62,7 @@ struct NinePixelShader9
 
     uint64_t last_key;
     void *last_cso;
+    unsigned *last_const_ranges;
 
     uint64_t next_key;
 };
@@ -131,7 +132,7 @@ NinePixelShader9_UpdateKey( struct NinePixelShader9 *ps,
 }
 
 void *
-NinePixelShader9_GetVariant( struct NinePixelShader9 *ps );
+NinePixelShader9_GetVariant( struct NinePixelShader9 *ps, unsigned **const_ranges );
 
 /*** public ***/
 

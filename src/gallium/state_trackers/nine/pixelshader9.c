@@ -79,7 +79,9 @@ NinePixelShader9_ctor( struct NinePixelShader9 *This,
     This->byte_code.size = info.byte_size;
 
     This->variant.cso = info.cso;
+    This->variant.const_ranges = info.const_ranges;
     This->last_cso = info.cso;
+    This->last_const_ranges = info.const_ranges;
     This->last_key = 0;
 
     This->sampler_mask = info.sampler_mask;
@@ -116,6 +118,7 @@ NinePixelShader9_dtor( struct NinePixelShader9 *This )
                 if (This->base.device->context.cso_shader.ps == var->cso)
                     pipe->bind_fs_state(pipe, NULL);
                 pipe->delete_fs_state(pipe, var->cso);
+                FREE(var->const_ranges);
             }
             var = var->next;
         } while (var);
@@ -156,7 +159,7 @@ NinePixelShader9_GetFunction( struct NinePixelShader9 *This,
 }
 
 void *
-NinePixelShader9_GetVariant( struct NinePixelShader9 *This )
+NinePixelShader9_GetVariant( struct NinePixelShader9 *This, unsigned **const_ranges )
 {
     /* GetVariant is called from nine_context, thus we can
      * get pipe directly */
@@ -165,10 +168,12 @@ NinePixelShader9_GetVariant( struct NinePixelShader9 *This )
     uint64_t key;
 
     key = This->next_key;
-    if (key == This->last_key)
+    if (key == This->last_key) {
+        *const_ranges = This->last_const_ranges;
         return This->last_cso;
+    }
 
-    cso = nine_shader_variant_get(&This->variant, key);
+    cso = nine_shader_variant_get(&This->variant, const_ranges, key);
     if (!cso) {
         struct NineDevice9 *device = This->base.device;
         struct nine_shader_info info;
@@ -205,12 +210,14 @@ NinePixelShader9_GetVariant( struct NinePixelShader9 *This )
         hr = nine_translate_shader(This->base.device, &info, pipe);
         if (FAILED(hr))
             return NULL;
-        nine_shader_variant_add(&This->variant, key, info.cso);
+        nine_shader_variant_add(&This->variant, key, info.cso, info.const_ranges);
         cso = info.cso;
+        *const_ranges = info.const_ranges;
     }
 
     This->last_key = key;
     This->last_cso = cso;
+    This->last_const_ranges = *const_ranges;
 
     return cso;
 }

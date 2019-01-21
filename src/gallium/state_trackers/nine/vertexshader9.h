@@ -72,6 +72,7 @@ struct NineVertexShader9
 
     uint64_t last_key;
     void *last_cso;
+    unsigned *last_const_ranges;
 
     uint64_t next_key;
 
@@ -123,7 +124,7 @@ NineVertexShader9_UpdateKey( struct NineVertexShader9 *vs,
 }
 
 void *
-NineVertexShader9_GetVariant( struct NineVertexShader9 *vs );
+NineVertexShader9_GetVariant( struct NineVertexShader9 *vs, unsigned **const_ranges );
 
 void *
 NineVertexShader9_GetVariantProcessVertices( struct NineVertexShader9 *vs,

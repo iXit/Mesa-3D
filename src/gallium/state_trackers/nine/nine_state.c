@@ -495,7 +495,19 @@ prepare_vs_constants_userbuf(struct NineDevice9 *device)
 
     assert(cb.buffer && upload_ptr);
 
-    memcpy(upload_ptr, cb.user_buffer, cb.buffer_size);
+    if (!context->cso_shader.vs_const_ranges) {
+        memcpy(upload_ptr, cb.user_buffer, cb.buffer_size);
+    } else {
+        unsigned i = 0;
+        unsigned offset = 0;
+        while (context->cso_shader.vs_const_ranges[i*2+1] != 0) {
+            memcpy(upload_ptr+offset,
+                   &((float*)cb.user_buffer)[4*context->cso_shader.vs_const_ranges[i*2]],
+                   context->cso_shader.vs_const_ranges[i*2+1] * sizeof(float[4]));
+            offset += context->cso_shader.vs_const_ranges[i*2+1] * sizeof(float[4]);
+            i++;
+        }
+    }
 
     u_upload_unmap(context->pipe->const_uploader);
     cb.user_buffer = NULL;
@@ -571,7 +583,19 @@ prepare_ps_constants_userbuf(struct NineDevice9 *device)
 
     assert(cb.buffer && upload_ptr);
 
-    memcpy(upload_ptr, cb.user_buffer, cb.buffer_size);
+    if (!context->cso_shader.ps_const_ranges) {
+        memcpy(upload_ptr, cb.user_buffer, cb.buffer_size);
+    } else {
+        unsigned i = 0;
+        unsigned offset = 0;
+        while (context->cso_shader.ps_const_ranges[i*2+1] != 0) {
+            memcpy(upload_ptr+offset,
+                   &((float*)cb.user_buffer)[4*context->cso_shader.ps_const_ranges[i*2]],
+                   context->cso_shader.ps_const_ranges[i*2+1] * sizeof(float[4]));
+            offset += context->cso_shader.ps_const_ranges[i*2+1] * sizeof(float[4]);
+            i++;
+        }
+    }
 
     u_upload_unmap(context->pipe->const_uploader);
     cb.user_buffer = NULL;

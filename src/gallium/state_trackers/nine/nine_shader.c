@@ -3837,7 +3837,7 @@ nine_translate_shader(struct NineDevice9 *device, struct nine_shader_info *info,
     }
 
     /* Recompile after compacting constant slots if possible */
-    if (!tx->indirect_const_access && !info->swvp_on && tx->num_slots > 0 && 0) {
+    if (!tx->indirect_const_access && !info->swvp_on && tx->num_slots > 0) {
         unsigned *slot_map;
         unsigned c;
         int i, j, num_ranges, prev;

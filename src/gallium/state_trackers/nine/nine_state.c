@@ -437,7 +437,7 @@ prepare_vs_constants_userbuf(struct NineDevice9 *device)
     struct pipe_constant_buffer cb;
     cb.buffer = NULL;
     cb.buffer_offset = 0;
-    cb.buffer_size = context->vs->const_used_size;
+    cb.buffer_size = context->cso_shader.vs_const_used_size;
     cb.user_buffer = context->vs_const_f;
 
     if (context->swvp) {
@@ -518,7 +518,7 @@ prepare_ps_constants_userbuf(struct NineDevice9 *device)
     struct pipe_constant_buffer cb;
     cb.buffer = NULL;
     cb.buffer_offset = 0;
-    cb.buffer_size = context->ps->const_used_size;
+    cb.buffer_size = context->cso_shader.ps_const_used_size;
     cb.user_buffer = context->ps_const_f;
 
     if (context->changed.ps_const_i) {
@@ -535,7 +535,7 @@ prepare_ps_constants_userbuf(struct NineDevice9 *device)
 
     /* Upload special constants needed to implement PS1.x instructions like TEXBEM,TEXBEML and BEM */
     if (context->ps->bumpenvmat_needed) {
-        memcpy(context->ps_lconstf_temp, cb.user_buffer, cb.buffer_size);
+        memcpy(context->ps_lconstf_temp, cb.user_buffer, 8 * sizeof(float[4]));
         memcpy(&context->ps_lconstf_temp[4 * 8], &device->context.bumpmap_vars, sizeof(device->context.bumpmap_vars));
 
         cb.user_buffer = context->ps_lconstf_temp;
@@ -545,7 +545,7 @@ prepare_ps_constants_userbuf(struct NineDevice9 *device)
         context->rs[D3DRS_FOGENABLE]) {
         float *dst = &context->ps_lconstf_temp[4 * 32];
         if (cb.user_buffer != context->ps_lconstf_temp) {
-            memcpy(context->ps_lconstf_temp, cb.user_buffer, cb.buffer_size);
+            memcpy(context->ps_lconstf_temp, cb.user_buffer, 32 * sizeof(float[4]));
             cb.user_buffer = context->ps_lconstf_temp;
         }
 
@@ -556,7 +556,6 @@ prepare_ps_constants_userbuf(struct NineDevice9 *device)
         } else if (context->rs[D3DRS_FOGTABLEMODE] != D3DFOG_NONE) {
             dst[4] = asfloat(context->rs[D3DRS_FOGDENSITY]);
         }
-        cb.buffer_size = 4 * 4 * 34;
     }
 
     if (!cb.buffer_size)
@@ -603,7 +602,9 @@ prepare_vs(struct NineDevice9 *device, uint8_t shader_changed)
 
     /* likely because we dislike FF */
     if (likely(context->programmable_vs)) {
-        context->cso_shader.vs = NineVertexShader9_GetVariant(vs, &context->cso_shader.vs_const_ranges);
+        context->cso_shader.vs = NineVertexShader9_GetVariant(vs,
+                                                              &context->cso_shader.vs_const_ranges,
+                                                              &context->cso_shader.vs_const_used_size);
     } else {
         vs = device->ff.vs;
         context->cso_shader.vs = vs->ff_cso;
@@ -637,7 +638,9 @@ prepare_ps(struct NineDevice9 *device, uint8_t shader_changed)
         return 0;
 
     if (likely(ps)) {
-        context->cso_shader.ps = NinePixelShader9_GetVariant(ps, &context->cso_shader.ps_const_ranges);
+        context->cso_shader.ps = NinePixelShader9_GetVariant(ps,
+                                                             &context->cso_shader.ps_const_ranges,
+                                                             &context->cso_shader.ps_const_used_size);
     } else {
         ps = device->ff.ps;
         context->cso_shader.ps = ps->ff_cso;

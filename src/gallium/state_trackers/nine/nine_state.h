@@ -240,8 +240,10 @@ struct nine_context {
     struct {
         void *vs;
         unsigned *vs_const_ranges;
+        unsigned vs_const_used_size;
         void *ps;
         unsigned *ps_const_ranges;
+        unsigned ps_const_used_size;
     } cso_shader;
 
     struct pipe_context *pipe;

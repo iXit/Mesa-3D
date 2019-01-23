@@ -55,8 +55,6 @@ struct NineVertexShader9
     boolean point_size; /* if true, set rasterizer.point_size_per_vertex to 1 */
     boolean swvp_only;
 
-    unsigned const_used_size; /* in bytes */
-
     struct nine_lconstf lconstf;
 
     boolean int_slots_used[NINE_MAX_CONST_I];
@@ -73,6 +71,7 @@ struct NineVertexShader9
     uint64_t last_key;
     void *last_cso;
     unsigned *last_const_ranges;
+    unsigned last_const_used_size; /* in bytes */
 
     uint64_t next_key;
 
@@ -124,7 +123,9 @@ NineVertexShader9_UpdateKey( struct NineVertexShader9 *vs,
 }
 
 void *
-NineVertexShader9_GetVariant( struct NineVertexShader9 *vs, unsigned **const_ranges );
+NineVertexShader9_GetVariant( struct NineVertexShader9 *vs,
+                              unsigned **const_ranges,
+                              unsigned *const_used_size );
 
 void *
 NineVertexShader9_GetVariantProcessVertices( struct NineVertexShader9 *vs,

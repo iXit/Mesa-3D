@@ -95,11 +95,12 @@ NineVertexShader9_ctor( struct NineVertexShader9 *This,
 
     This->variant.cso = info.cso;
     This->variant.const_ranges = info.const_ranges;
+    This->variant.const_used_size = info.const_used_size;
     This->last_cso = info.cso;
     This->last_const_ranges = info.const_ranges;
+    This->last_const_used_size = info.const_used_size;
     This->last_key = (uint32_t) (info.swvp_on << 9);
 
-    This->const_used_size = info.const_used_size;
     This->lconstf = info.lconstf;
     This->sampler_mask = info.sampler_mask;
     This->position_t = info.position_t;
@@ -185,7 +186,9 @@ NineVertexShader9_GetFunction( struct NineVertexShader9 *This,
 }
 
 void *
-NineVertexShader9_GetVariant( struct NineVertexShader9 *This, unsigned **const_ranges )
+NineVertexShader9_GetVariant( struct NineVertexShader9 *This,
+                              unsigned **const_ranges,
+                              unsigned *const_used_size )
 {
     /* GetVariant is called from nine_context, thus we can
      * get pipe directly */
@@ -196,10 +199,11 @@ NineVertexShader9_GetVariant( struct NineVertexShader9 *This, unsigned **const_r
     key = This->next_key;
     if (key == This->last_key) {
         *const_ranges = This->last_const_ranges;
+        *const_used_size = This->last_const_used_size;
         return This->last_cso;
     }
 
-    cso = nine_shader_variant_get(&This->variant, const_ranges, key);
+    cso = nine_shader_variant_get(&This->variant, const_ranges, const_used_size, key);
     if (!cso) {
         struct NineDevice9 *device = This->base.device;
         struct nine_shader_info info;
@@ -223,14 +227,17 @@ NineVertexShader9_GetVariant( struct NineVertexShader9 *This, unsigned **const_r
         hr = nine_translate_shader(This->base.device, &info, pipe);
         if (FAILED(hr))
             return NULL;
-        nine_shader_variant_add(&This->variant, key, info.cso, info.const_ranges);
+        nine_shader_variant_add(&This->variant, key, info.cso,
+                                info.const_ranges, info.const_used_size);
         cso = info.cso;
         *const_ranges = info.const_ranges;
+        *const_used_size = info.const_used_size;
     }
 
     This->last_key = key;
     This->last_cso = cso;
     This->last_const_ranges = *const_ranges;
+    This->last_const_used_size = *const_used_size;
 
     return cso;
 }

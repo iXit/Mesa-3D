@@ -43,8 +43,6 @@ struct NinePixelShader9
         uint8_t version; /* (major << 4) | minor */
     } byte_code;
 
-    unsigned const_used_size; /* in bytes */
-
     uint8_t bumpenvmat_needed;
     uint16_t sampler_mask;
     uint8_t rt_mask;
@@ -63,6 +61,7 @@ struct NinePixelShader9
     uint64_t last_key;
     void *last_cso;
     unsigned *last_const_ranges;
+    unsigned last_const_used_size; /* in bytes */
 
     uint64_t next_key;
 };
@@ -132,7 +131,9 @@ NinePixelShader9_UpdateKey( struct NinePixelShader9 *ps,
 }
 
 void *
-NinePixelShader9_GetVariant( struct NinePixelShader9 *ps, unsigned **const_ranges );
+NinePixelShader9_GetVariant( struct NinePixelShader9 *ps,
+                             unsigned **const_ranges,
+                             unsigned *const_used_size );
 
 /*** public ***/
 

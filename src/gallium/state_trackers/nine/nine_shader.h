@@ -119,16 +119,21 @@ struct nine_shader_variant
     struct nine_shader_variant *next;
     void *cso;
     unsigned *const_ranges;
+    unsigned const_used_size;
     uint64_t key;
 };
 
 static inline void *
-nine_shader_variant_get(struct nine_shader_variant *list, unsigned **const_ranges, uint64_t key)
+nine_shader_variant_get(struct nine_shader_variant *list,
+                        unsigned **const_ranges,
+                        unsigned *const_used_size,
+                        uint64_t key)
 {
     while (list->key != key && list->next)
         list = list->next;
     if (list->key == key) {
         *const_ranges = list->const_ranges;
+        *const_used_size = list->const_used_size;
         return list->cso;
     }
     return NULL;
@@ -136,7 +141,9 @@ nine_shader_variant_get(struct nine_shader_variant *list, unsigned **const_range
 
 static inline boolean
 nine_shader_variant_add(struct nine_shader_variant *list,
-                          uint64_t key, void *cso, unsigned *const_ranges)
+                        uint64_t key, void *cso,
+                        unsigned *const_ranges,
+                        unsigned const_used_size)
 {
     while (list->next) {
         assert(list->key != key);
@@ -149,6 +156,7 @@ nine_shader_variant_add(struct nine_shader_variant *list,
     list->next->key = key;
     list->next->cso = cso;
     list->next->const_ranges = const_ranges;
+    list->next->const_used_size = const_used_size;
     return TRUE;
 }
 

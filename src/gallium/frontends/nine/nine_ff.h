@@ -83,7 +83,8 @@ nine_ff_get_projected_key(struct nine_context *context, unsigned num_stages)
     for (s = 0; s < num_stages; ++s) {
         unsigned gen = (context->ff.tex_stage[s][D3DTSS_TEXCOORDINDEX] >> 16) + 1;
         unsigned dim = context->ff.tex_stage[s][D3DTSS_TEXTURETRANSFORMFLAGS] & 0x7;
-        unsigned proj = !!(context->ff.tex_stage[s][D3DTSS_TEXTURETRANSFORMFLAGS] & D3DTTFF_PROJECTED);
+        unsigned proj = !!(context->ff.tex_stage[s][D3DTSS_TEXTURETRANSFORMFLAGS] & D3DTTFF_PROJECTED)
+            && context->texture[s].enabled && context->texture[s].pstype != 2; /* Disable for cube textures */
 
         if (!context->vs) {
             if (dim > 4)

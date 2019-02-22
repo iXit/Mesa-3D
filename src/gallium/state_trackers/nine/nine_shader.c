@@ -2333,8 +2333,9 @@ DECL_SPECIAL(RCP)
     struct ureg_dst tmp = tx->mul_zero_wins ? dst : tx_scratch(tx);
     ureg_RCP(ureg, tmp, src);
     if (!tx->mul_zero_wins) {
-        ureg_MIN(ureg, tmp, ureg_imm1f(ureg, FLT_MAX), ureg_src(tmp));
-        ureg_MAX(ureg, dst, ureg_imm1f(ureg, -FLT_MAX), ureg_src(tmp));
+        /* FLT_MAX has issues with Rayman */
+        ureg_MIN(ureg, tmp, ureg_imm1f(ureg, FLT_MAX/2.f), ureg_src(tmp));
+        ureg_MAX(ureg, dst, ureg_imm1f(ureg, -FLT_MAX/2.f), ureg_src(tmp));
     }
     return D3D_OK;
 }

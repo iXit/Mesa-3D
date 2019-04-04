@@ -125,8 +125,11 @@ NineBindBufferToDevice( struct NineDevice9 *device,
             list_add(&buf->managed.list, &device->update_buffers);
         buf->bind_count++;
     }
-    if (old)
+    if (old) {
         old->bind_count--;
+        if (!old->bind_count && old->managed.dirty)
+            list_delinit(&old->managed.list);
+    }
 
     nine_bind(slot, buf);
 }

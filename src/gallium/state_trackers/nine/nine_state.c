@@ -2790,8 +2790,9 @@ nine_state_set_defaults(struct NineDevice9 *device, const D3DCAPS9 *caps,
 }
 
 void
-nine_state_clear(struct nine_state *state, const boolean device)
+nine_device_state_clear(struct NineDevice9 *device)
 {
+    struct nine_state *state = &device->state;
     unsigned i;
 
     for (i = 0; i < ARRAY_SIZE(state->rt); ++i)
@@ -2801,16 +2802,15 @@ nine_state_clear(struct nine_state *state, const boolean device)
     nine_bind(&state->ps, NULL);
     nine_bind(&state->vdecl, NULL);
     for (i = 0; i < PIPE_MAX_ATTRIBS; ++i)
-        nine_bind(&state->stream[i], NULL);
+        NineBindBufferToDevice(device,
+                               (struct NineBuffer9 **)&state->stream[i],
+                               NULL);
+    NineBindBufferToDevice(device,
+                           (struct NineBuffer9 **)&state->idxbuf,
+                           NULL);
 
-    nine_bind(&state->idxbuf, NULL);
-    for (i = 0; i < NINE_MAX_SAMPLERS; ++i) {
-        if (device &&
-            state->texture[i] &&
-          --state->texture[i]->bind_count == 0)
-            list_delinit(&state->texture[i]->list);
-        nine_bind(&state->texture[i], NULL);
-    }
+    for (i = 0; i < NINE_MAX_SAMPLERS; ++i)
+        NineBindTextureToDevice(device, &state->texture[i], NULL);
 }
 
 void

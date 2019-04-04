@@ -531,7 +531,7 @@ NineDevice9_dtor( struct NineDevice9 *This )
 
     nine_ff_fini(This);
     nine_state_destroy_sw(This);
-    nine_state_clear(&This->state, TRUE);
+    nine_device_state_clear(This);
     nine_context_clear(This);
 
     nine_bind(&This->record, NULL);
@@ -907,7 +907,7 @@ NineDevice9_Reset( struct NineDevice9 *This,
     }
 
     nine_csmt_process(This);
-    nine_state_clear(&This->state, TRUE);
+    nine_device_state_clear(This);
     nine_context_clear(This);
 
     NineDevice9_SetDefaultState(This, TRUE);

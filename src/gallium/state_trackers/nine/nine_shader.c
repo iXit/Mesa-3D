@@ -1299,7 +1299,7 @@ _tx_dst_param(struct shader_translator *tx, const struct sm1_dst_param *param)
         case 1:
             if (ureg_dst_is_undef(tx->regs.oFog))
                 tx->regs.oFog =
-                    ureg_saturate(ureg_DECL_output(tx->ureg, TGSI_SEMANTIC_FOG, 0));
+                    ureg_saturate(ureg_DECL_output(tx->ureg, TGSI_SEMANTIC_GENERIC, 16));
             dst = tx->regs.oFog;
             break;
         case 2:
@@ -2039,15 +2039,16 @@ sm1_declusage_to_tgsi(struct tgsi_declaration_semantic *sem,
      * are close together or low.
      *
      *
-     * POSITION >= 1: 10 * index + 6
-     * COLOR >= 2: 10 * (index-1) + 7
+     * POSITION >= 1: 10 * index + 7
+     * COLOR >= 2: 10 * (index-1) + 8
+     * FOG: 16
      * TEXCOORD[0..15]: index
-     * BLENDWEIGHT: 10 * index + 18
-     * BLENDINDICES: 10 * index + 19
-     * NORMAL: 10 * index + 20
-     * TANGENT: 10 * index + 21
-     * BINORMAL: 10 * index + 22
-     * TESSFACTOR: 10 * index + 23
+     * BLENDWEIGHT: 10 * index + 19
+     * BLENDINDICES: 10 * index + 20
+     * NORMAL: 10 * index + 21
+     * TANGENT: 10 * index + 22
+     * BINORMAL: 10 * index + 23
+     * TESSFACTOR: 10 * index + 24
      */
 
     switch (dcl->usage) {
@@ -2059,7 +2060,7 @@ sm1_declusage_to_tgsi(struct tgsi_declaration_semantic *sem,
             sem->Index = 0;
         } else {
             sem->Name = TGSI_SEMANTIC_GENERIC;
-            sem->Index = 10 * index + 6;
+            sem->Index = 10 * index + 7;
         }
         break;
     case D3DDECLUSAGE_COLOR:
@@ -2068,13 +2069,13 @@ sm1_declusage_to_tgsi(struct tgsi_declaration_semantic *sem,
             sem->Index = index;
         } else {
             sem->Name = TGSI_SEMANTIC_GENERIC;
-            sem->Index = 10 * (index-1) + 7;
+            sem->Index = 10 * (index-1) + 8;
         }
         break;
     case D3DDECLUSAGE_FOG:
         assert(index == 0);
-        sem->Name = TGSI_SEMANTIC_FOG;
-        sem->Index = 0;
+        sem->Name = TGSI_SEMANTIC_GENERIC;
+        sem->Index = 16;
         break;
     case D3DDECLUSAGE_PSIZE:
         assert(index == 0);
@@ -2091,27 +2092,27 @@ sm1_declusage_to_tgsi(struct tgsi_declaration_semantic *sem,
         break;
     case D3DDECLUSAGE_BLENDWEIGHT:
         sem->Name = TGSI_SEMANTIC_GENERIC;
-        sem->Index = 10 * index + 18;
+        sem->Index = 10 * index + 19;
         break;
     case D3DDECLUSAGE_BLENDINDICES:
         sem->Name = TGSI_SEMANTIC_GENERIC;
-        sem->Index = 10 * index + 19;
+        sem->Index = 10 * index + 20;
         break;
     case D3DDECLUSAGE_NORMAL:
         sem->Name = TGSI_SEMANTIC_GENERIC;
-        sem->Index = 10 * index + 20;
+        sem->Index = 10 * index + 21;
         break;
     case D3DDECLUSAGE_TANGENT:
         sem->Name = TGSI_SEMANTIC_GENERIC;
-        sem->Index = 10 * index + 21;
+        sem->Index = 10 * index + 22;
         break;
     case D3DDECLUSAGE_BINORMAL:
         sem->Name = TGSI_SEMANTIC_GENERIC;
-        sem->Index = 10 * index + 22;
+        sem->Index = 10 * index + 23;
         break;
     case D3DDECLUSAGE_TESSFACTOR:
         sem->Name = TGSI_SEMANTIC_GENERIC;
-        sem->Index = 10 * index + 23;
+        sem->Index = 10 * index + 24;
         break;
     case D3DDECLUSAGE_SAMPLE:
         sem->Name = TGSI_SEMANTIC_COUNT;
@@ -3735,7 +3736,7 @@ shader_add_ps_fog_stage(struct shader_translator *tx, struct ureg_src src_col)
         ureg_MUL(ureg, fog_factor, tx_src_scalar(fog_factor), ureg_imm1f(ureg, -1.442695f));
         ureg_EX2(ureg, fog_factor, tx_src_scalar(fog_factor));
     } else {
-        fog_vs = ureg_scalar(ureg_DECL_fs_input(ureg, TGSI_SEMANTIC_FOG, 0,
+        fog_vs = ureg_scalar(ureg_DECL_fs_input(ureg, TGSI_SEMANTIC_GENERIC, 16,
                                             TGSI_INTERPOLATE_PERSPECTIVE),
                                             TGSI_SWIZZLE_X);
         ureg_MOV(ureg, fog_factor, fog_vs);
@@ -3768,7 +3769,7 @@ static void parse_shader(struct shader_translator *tx)
     }
 
     if (IS_VS && tx->version.major < 3 && ureg_dst_is_undef(tx->regs.oFog) && info->fog_enable) {
-        tx->regs.oFog = ureg_DECL_output(tx->ureg, TGSI_SEMANTIC_FOG, 0);
+        tx->regs.oFog = ureg_DECL_output(tx->ureg, TGSI_SEMANTIC_GENERIC, 16);
         ureg_MOV(tx->ureg, ureg_writemask(tx->regs.oFog, TGSI_WRITEMASK_X), ureg_imm1f(tx->ureg, 0.0f));
     }
 

@@ -2716,7 +2716,7 @@ NineDevice9_SetSoftwareVertexProcessing( struct NineDevice9 *This,
         nine_context_set_swvp(This, bSoftware);
         return D3D_OK;
     } else
-        return D3DERR_INVALIDCALL; /* msdn. TODO: check in practice */
+        return D3D_OK; /* msdn seems to indicate INVALIDCALL, but at least Halo expects OK */
 }
 
 BOOL NINE_WINAPI

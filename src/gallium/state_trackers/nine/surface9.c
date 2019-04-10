@@ -139,22 +139,22 @@ NineSurface9_ctor( struct NineSurface9 *This,
     }
 
     /* Get true format */
-    This->format_conversion = d3d9_to_pipe_format_checked(This->base.info.screen,
+    This->format_internal = d3d9_to_pipe_format_checked(This->base.info.screen,
                                                          pDesc->Format,
                                                          This->base.info.target,
                                                          This->base.info.nr_samples,
                                                          This->base.info.bind,
                                                          FALSE,
                                                          TRUE);
-    if (This->base.info.format != This->format_conversion) {
-        This->data_conversion = align_calloc(
-            nine_format_get_level_alloc_size(This->format_conversion,
+    if (This->base.info.format != This->format_internal) {
+        This->data_internal = align_calloc(
+            nine_format_get_level_alloc_size(This->format_internal,
                                              pDesc->Width,
                                              pDesc->Height,
                                              0), 32);
-        if (!This->data_conversion)
+        if (!This->data_internal)
             return E_OUTOFMEMORY;
-        This->stride_conversion = nine_format_get_stride(This->format_conversion,
+        This->stride_internal = nine_format_get_stride(This->format_internal,
                                                          pDesc->Width);
     }
 
@@ -225,8 +225,8 @@ NineSurface9_dtor( struct NineSurface9 *This )
     /* Release system memory when we have to manage it (no parent) */
     if (!This->base.base.container && This->data)
         align_free(This->data);
-    if (This->data_conversion)
-        align_free(This->data_conversion);
+    if (This->data_internal)
+        align_free(This->data_internal);
     NineResource9_dtor(&This->base);
 }
 
@@ -481,11 +481,11 @@ NineSurface9_LockRect( struct NineSurface9 *This,
     if (p_atomic_read(&This->pending_uploads_counter))
         nine_csmt_process(This->base.base.device);
 
-    if (This->data_conversion) {
+    if (This->data_internal) {
         /* For now we only have uncompressed formats here */
-        pLockedRect->Pitch = This->stride_conversion;
-        pLockedRect->pBits = This->data_conversion + box.y * This->stride_conversion +
-            util_format_get_stride(This->format_conversion, box.x);
+        pLockedRect->Pitch = This->stride_internal;
+        pLockedRect->pBits = This->data_internal + box.y * This->stride_internal +
+            util_format_get_stride(This->format_internal, box.x);
     } else if (This->data) {
         DBG("returning system memory\n");
         /* ATI1 and ATI2 need special handling, because of d3d9 bug.
@@ -551,14 +551,14 @@ NineSurface9_UnlockRect( struct NineSurface9 *This )
     }
     --This->lock_count;
 
-    if (This->data_conversion) {
+    if (This->data_internal) {
         if (This->data) {
             (void) util_format_translate(This->base.info.format,
                                          This->data, This->stride,
                                          0, 0,
-                                         This->format_conversion,
-                                         This->data_conversion,
-                                         This->stride_conversion,
+                                         This->format_internal,
+                                         This->data_internal,
+                                         This->stride_internal,
                                          0, 0,
                                          This->desc.Width, This->desc.Height);
         } else {
@@ -573,9 +573,9 @@ NineSurface9_UnlockRect( struct NineSurface9 *This )
                                     This->base.resource,
                                     This->level,
                                     &dst_box,
-                                    This->format_conversion,
-                                    This->data_conversion,
-                                    This->stride_conversion,
+                                    This->format_internal,
+                                    This->data_internal,
+                                    This->stride_internal,
                                     0, /* depth = 1 */
                                     &src_box);
         }
@@ -681,10 +681,10 @@ NineSurface9_CopyMemToDefault( struct NineSurface9 *This,
             nine_csmt_process(This->base.base.device);
     }
 
-    if (This->data_conversion)
-        (void) util_format_translate(This->format_conversion,
-                                     This->data_conversion,
-                                     This->stride_conversion,
+    if (This->data_internal)
+        (void) util_format_translate(This->format_internal,
+                                     This->data_internal,
+                                     This->stride_internal,
                                      dst_x, dst_y,
                                      From->base.info.format,
                                      From->data, From->stride,

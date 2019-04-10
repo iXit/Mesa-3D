@@ -112,21 +112,21 @@ NineVolume9_ctor( struct NineVolume9 *This,
                                                  This->stride, pDesc->Height);
 
     /* Get true format */
-    This->format_conversion = d3d9_to_pipe_format_checked(This->info.screen,
+    This->format_internal = d3d9_to_pipe_format_checked(This->info.screen,
                                                          pDesc->Format,
                                                          This->info.target,
                                                          This->info.nr_samples,
                                                          This->info.bind, FALSE,
                                                          TRUE);
-    if (This->info.format != This->format_conversion) {
-        This->stride_conversion = nine_format_get_stride(This->format_conversion,
+    if (This->info.format != This->format_internal) {
+        This->stride_internal = nine_format_get_stride(This->format_internal,
                                                          pDesc->Width);
-        This->layer_stride_conversion = util_format_get_2d_size(This->format_conversion,
-                                                                This->stride_conversion,
+        This->layer_stride_internal = util_format_get_2d_size(This->format_internal,
+                                                                This->stride_internal,
                                                                 pDesc->Height);
-        This->data_conversion = align_calloc(This->layer_stride_conversion *
+        This->data_internal = align_calloc(This->layer_stride_internal *
                                              This->desc.Depth, 32);
-        if (!This->data_conversion)
+        if (!This->data_internal)
             return E_OUTOFMEMORY;
     }
 
@@ -157,8 +157,8 @@ NineVolume9_dtor( struct NineVolume9 *This )
 
     if (This->data)
         align_free(This->data);
-    if (This->data_conversion)
-        align_free(This->data_conversion);
+    if (This->data_internal)
+        align_free(This->data_internal);
 
     pipe_resource_reference(&This->resource, NULL);
 
@@ -314,13 +314,13 @@ NineVolume9_LockBox( struct NineVolume9 *This,
     if (p_atomic_read(&This->pending_uploads_counter))
         nine_csmt_process(This->base.device);
 
-    if (This->data_conversion) {
+    if (This->data_internal) {
         /* For now we only have uncompressed formats here */
-        pLockedVolume->RowPitch = This->stride_conversion;
-        pLockedVolume->SlicePitch = This->layer_stride_conversion;
-        pLockedVolume->pBits = This->data_conversion + box.z * This->layer_stride_conversion +
-                               box.y * This->stride_conversion +
-                               util_format_get_stride(This->format_conversion, box.x);
+        pLockedVolume->RowPitch = This->stride_internal;
+        pLockedVolume->SlicePitch = This->layer_stride_internal;
+        pLockedVolume->pBits = This->data_internal + box.z * This->layer_stride_internal +
+                               box.y * This->stride_internal +
+                               util_format_get_stride(This->format_internal, box.x);
     } else if (This->data) {
         pLockedVolume->RowPitch = This->stride;
         pLockedVolume->SlicePitch = This->layer_stride;
@@ -371,7 +371,7 @@ NineVolume9_UnlockBox( struct NineVolume9 *This )
     }
     --This->lock_count;
 
-    if (This->data_conversion) {
+    if (This->data_internal) {
         struct pipe_box box;
 
         u_box_3d(0, 0, 0, This->desc.Width, This->desc.Height, This->desc.Depth,
@@ -383,10 +383,10 @@ NineVolume9_UnlockBox( struct NineVolume9 *This )
                                             This->data, This->stride,
                                             This->layer_stride,
                                             0, 0, 0,
-                                            This->format_conversion,
-                                            This->data_conversion,
-                                            This->stride_conversion,
-                                            This->layer_stride_conversion,
+                                            This->format_internal,
+                                            This->data_internal,
+                                            This->stride_internal,
+                                            This->layer_stride_internal,
                                             0, 0, 0,
                                             This->desc.Width, This->desc.Height,
                                             This->desc.Depth);
@@ -397,10 +397,10 @@ NineVolume9_UnlockBox( struct NineVolume9 *This )
                                     This->resource,
                                     This->level,
                                     &box,
-                                    This->format_conversion,
-                                    This->data_conversion,
-                                    This->stride_conversion,
-                                    This->layer_stride_conversion,
+                                    This->format_internal,
+                                    This->data_internal,
+                                    This->stride_internal,
+                                    This->layer_stride_internal,
                                     &box);
         }
     }
@@ -456,11 +456,11 @@ NineVolume9_CopyMemToDefault( struct NineVolume9 *This,
                             From->layer_stride,
                             &src_box);
 
-    if (This->data_conversion)
-        (void) util_format_translate_3d(This->format_conversion,
-                                        This->data_conversion,
-                                        This->stride_conversion,
-                                        This->layer_stride_conversion,
+    if (This->data_internal)
+        (void) util_format_translate_3d(This->format_internal,
+                                        This->data_internal,
+                                        This->stride_internal,
+                                        This->layer_stride_internal,
                                         dstx, dsty, dstz,
                                         From->info.format,
                                         From->data, From->stride,

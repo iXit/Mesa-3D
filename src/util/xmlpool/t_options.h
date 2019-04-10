@@ -324,6 +324,11 @@ DRI_CONF_OPT_BEGIN(csmt_force, int, def) \
         DRI_CONF_DESC(en,gettext("If set to 1, force gallium nine CSMT. If set to 0, disable it. By default (-1) CSMT is enabled on known thread-safe drivers.")) \
 DRI_CONF_OPT_END
 
+#define DRI_CONF_NINE_DYNAMICTEXTUREWORKAROUND(def) \
+DRI_CONF_OPT_BEGIN_B(dynamic_texture_workaround, def) \
+        DRI_CONF_DESC(en,gettext("If set to true, use a ram intermediate buffer for dynamic textures. Increases ram usage, which can cause out of memory issues, but can fix glitches for some games.")) \
+DRI_CONF_OPT_END
+
 /**
  * \brief radeonsi specific configuration options
  */

@@ -59,6 +59,7 @@ DRI_CONF_BEGIN
         DRI_CONF_NINE_ALLOWDISCARDDELAYEDRELEASE("true")
         DRI_CONF_NINE_TEARFREEDISCARD("false")
         DRI_CONF_NINE_CSMT(-1)
+        DRI_CONF_NINE_DYNAMICTEXTUREWORKAROUND("false")
     DRI_CONF_SECTION_END
 DRI_CONF_END;
 
@@ -297,6 +298,11 @@ drm_create_adapter( int fd,
         ctx->base.csmt_force = driQueryOptioni(&userInitOptions, "csmt_force");
     else
         ctx->base.csmt_force = -1;
+
+    if (driCheckOption(&userInitOptions, "dynamic_texture_workaround", DRI_BOOL))
+        ctx->base.dynamic_texture_workaround = driQueryOptionb(&userInitOptions, "dynamic_texture_workaround");
+    else
+        ctx->base.dynamic_texture_workaround = FALSE;
 
     driDestroyOptionCache(&userInitOptions);
     driDestroyOptionInfo(&defaultInitOptions);

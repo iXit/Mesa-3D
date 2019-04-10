@@ -42,6 +42,7 @@ struct d3dadapter9_context
     BOOL discard_delayed_release;
     BOOL tearfree_discard;
     int csmt_force;
+    BOOL dynamic_texture_workaround;
 
     void (*destroy)( struct d3dadapter9_context *ctx );
 };

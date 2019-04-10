@@ -291,6 +291,8 @@ NineDevice9_ctor( struct NineDevice9 *This,
     if (This->csmt_active)
         DBG("\033[1;32mCSMT is active\033[0m\n");
 
+    This->workarounds.dynamic_texture_workaround = pCTX->dynamic_texture_workaround;
+
     This->buffer_upload = nine_upload_create(This->pipe_secondary, 4 * 1024 * 1024, 4);
 
     /* Initialize a dummy VBO to be used when a vertex declaration does not

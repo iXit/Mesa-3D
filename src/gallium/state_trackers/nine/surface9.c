@@ -539,6 +539,7 @@ NineSurface9_LockRect( struct NineSurface9 *This,
 HRESULT NINE_WINAPI
 NineSurface9_UnlockRect( struct NineSurface9 *This )
 {
+    struct pipe_box dst_box, src_box;
     struct pipe_context *pipe;
     DBG("This=%p lock_count=%u\n", This, This->lock_count);
     user_assert(This->lock_count, D3DERR_INVALIDCALL);
@@ -551,35 +552,33 @@ NineSurface9_UnlockRect( struct NineSurface9 *This )
     --This->lock_count;
 
     if (This->data_conversion) {
-        struct pipe_transfer *transfer;
-        uint8_t *dst = This->data;
-        struct pipe_box box;
+        if (This->data) {
+            (void) util_format_translate(This->base.info.format,
+                                         This->data, This->stride,
+                                         0, 0,
+                                         This->format_conversion,
+                                         This->data_conversion,
+                                         This->stride_conversion,
+                                         0, 0,
+                                         This->desc.Width, This->desc.Height);
+        } else {
+            u_box_2d_zslice(0, 0, This->layer,
+                            This->desc.Width, This->desc.Height, &dst_box);
+            u_box_2d_zslice(0, 0, 0,
+                            This->desc.Width, This->desc.Height, &src_box);
 
-        u_box_origin_2d(This->desc.Width, This->desc.Height, &box);
-
-        pipe = NineDevice9_GetPipe(This->base.base.device);
-        if (!dst) {
-            dst = pipe->transfer_map(pipe,
-                                     This->base.resource,
-                                     This->level,
-                                     PIPE_TRANSFER_WRITE |
-                                     PIPE_TRANSFER_DISCARD_WHOLE_RESOURCE,
-                                     &box, &transfer);
-            if (!dst)
-                return D3D_OK;
+            nine_context_box_upload(This->base.base.device,
+                                    &This->pending_uploads_counter,
+                                    (struct NineUnknown *)This,
+                                    This->base.resource,
+                                    This->level,
+                                    &dst_box,
+                                    This->format_conversion,
+                                    This->data_conversion,
+                                    This->stride_conversion,
+                                    0, /* depth = 1 */
+                                    &src_box);
         }
-
-        (void) util_format_translate(This->base.info.format,
-                                     dst, This->data ? This->stride : transfer->stride,
-                                     0, 0,
-                                     This->format_conversion,
-                                     This->data_conversion,
-                                     This->stride_conversion,
-                                     0, 0,
-                                     This->desc.Width, This->desc.Height);
-
-        if (!This->data)
-            pipe_transfer_unmap(pipe, transfer);
     }
     return D3D_OK;
 }

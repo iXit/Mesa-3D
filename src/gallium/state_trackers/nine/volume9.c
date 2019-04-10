@@ -232,15 +232,16 @@ NineVolume9_AddDirtyRegion( struct NineVolume9 *This,
     }
 }
 
-static inline uint8_t *
-NineVolume9_GetSystemMemPointer(struct NineVolume9 *This, int x, int y, int z)
+static inline unsigned
+NineVolume9_GetSystemMemOffset(enum pipe_format format, unsigned stride,
+                               unsigned layer_stride,
+                               int x, int y, int z)
 {
-    unsigned x_offset = util_format_get_stride(This->info.format, x);
+    unsigned x_offset = util_format_get_stride(format, x);
 
-    y = util_format_get_nblocksy(This->info.format, y);
+    y = util_format_get_nblocksy(format, y);
 
-    assert(This->data);
-    return This->data + (z * This->layer_stride + y * This->stride + x_offset);
+    return z * layer_stride + y * stride + x_offset;
 }
 
 HRESULT NINE_WINAPI
@@ -324,8 +325,10 @@ NineVolume9_LockBox( struct NineVolume9 *This,
     } else if (This->data) {
         pLockedVolume->RowPitch = This->stride;
         pLockedVolume->SlicePitch = This->layer_stride;
-        pLockedVolume->pBits =
-            NineVolume9_GetSystemMemPointer(This, box.x, box.y, box.z);
+        pLockedVolume->pBits = This->data +
+            NineVolume9_GetSystemMemOffset(This->info.format, This->stride,
+                                           This->layer_stride,
+                                           box.x, box.y, box.z);
     } else {
         bool no_refs = !p_atomic_read(&This->base.bind) &&
             !p_atomic_read(&This->base.container->bind);

@@ -315,19 +315,22 @@ NineVolume9_LockBox( struct NineVolume9 *This,
     if (p_atomic_read(&This->pending_uploads_counter))
         nine_csmt_process(This->base.device);
 
-    if (This->data_internal) {
-        /* For now we only have uncompressed formats here */
-        pLockedVolume->RowPitch = This->stride_internal;
-        pLockedVolume->SlicePitch = This->layer_stride_internal;
-        pLockedVolume->pBits = This->data_internal + box.z * This->layer_stride_internal +
-                               box.y * This->stride_internal +
-                               util_format_get_stride(This->format_internal, box.x);
-    } else if (This->data) {
-        pLockedVolume->RowPitch = This->stride;
-        pLockedVolume->SlicePitch = This->layer_stride;
-        pLockedVolume->pBits = This->data +
-            NineVolume9_GetSystemMemOffset(This->info.format, This->stride,
-                                           This->layer_stride,
+    if (This->data_internal || This->data) {
+        enum pipe_format format = This->info.format;
+        unsigned stride = This->stride;
+        unsigned layer_stride = This->layer_stride;
+        uint8_t *data = This->data;
+        if (This->data_internal) {
+            format = This->format_internal;
+            stride = This->stride_internal;
+            layer_stride = This->layer_stride_internal;
+            data = This->data_internal;
+        }
+        pLockedVolume->RowPitch = stride;
+        pLockedVolume->SlicePitch = layer_stride;
+        pLockedVolume->pBits = data +
+            NineVolume9_GetSystemMemOffset(format, stride,
+                                           layer_stride,
                                            box.x, box.y, box.z);
     } else {
         bool no_refs = !p_atomic_read(&This->base.bind) &&

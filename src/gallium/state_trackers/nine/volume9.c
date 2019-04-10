@@ -372,39 +372,37 @@ NineVolume9_UnlockBox( struct NineVolume9 *This )
     --This->lock_count;
 
     if (This->data_conversion) {
-        struct pipe_transfer *transfer;
-        uint8_t *dst = This->data;
         struct pipe_box box;
 
         u_box_3d(0, 0, 0, This->desc.Width, This->desc.Height, This->desc.Depth,
                  &box);
 
-        pipe = NineDevice9_GetPipe(This->base.device);
-        if (!dst) {
-            dst = pipe->transfer_map(pipe,
-                                     This->resource,
-                                     This->level,
-                                     PIPE_TRANSFER_WRITE |
-                                     PIPE_TRANSFER_DISCARD_WHOLE_RESOURCE,
-                                     &box, &transfer);
-            if (!dst)
-                return D3D_OK;
+
+        if (This->data) {
+            (void) util_format_translate_3d(This->info.format,
+                                            This->data, This->stride,
+                                            This->layer_stride,
+                                            0, 0, 0,
+                                            This->format_conversion,
+                                            This->data_conversion,
+                                            This->stride_conversion,
+                                            This->layer_stride_conversion,
+                                            0, 0, 0,
+                                            This->desc.Width, This->desc.Height,
+                                            This->desc.Depth);
+        } else {
+            nine_context_box_upload(This->base.device,
+                                    &This->pending_uploads_counter,
+                                    (struct NineUnknown *)This,
+                                    This->resource,
+                                    This->level,
+                                    &box,
+                                    This->format_conversion,
+                                    This->data_conversion,
+                                    This->stride_conversion,
+                                    This->layer_stride_conversion,
+                                    &box);
         }
-
-        (void) util_format_translate_3d(This->info.format,
-                                        dst, This->data ? This->stride : transfer->stride,
-                                        This->data ? This->layer_stride : transfer->layer_stride,
-                                        0, 0, 0,
-                                        This->format_conversion,
-                                        This->data_conversion,
-                                        This->stride_conversion,
-                                        This->layer_stride_conversion,
-                                        0, 0, 0,
-                                        This->desc.Width, This->desc.Height,
-                                        This->desc.Depth);
-
-        if (!This->data)
-            pipe_transfer_unmap(pipe, transfer);
     }
 
     return D3D_OK;

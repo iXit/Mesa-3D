@@ -481,25 +481,28 @@ NineSurface9_LockRect( struct NineSurface9 *This,
     if (p_atomic_read(&This->pending_uploads_counter))
         nine_csmt_process(This->base.base.device);
 
-    if (This->data_internal) {
-        /* For now we only have uncompressed formats here */
-        pLockedRect->Pitch = This->stride_internal;
-        pLockedRect->pBits = This->data_internal + box.y * This->stride_internal +
-            util_format_get_stride(This->format_internal, box.x);
-    } else if (This->data) {
+    if (This->data_internal || This->data) {
+        enum pipe_format format = This->base.info.format;
+        unsigned stride = This->stride;
+        uint8_t *data = This->data;
+        if (This->data_internal) {
+            format = This->format_internal;
+            stride = This->stride_internal;
+            data = This->data_internal;
+        }
         DBG("returning system memory\n");
         /* ATI1 and ATI2 need special handling, because of d3d9 bug.
          * We must advertise to the application as if it is uncompressed
          * and bpp 8, and the app has a workaround to work with the fact
          * that it is actually compressed. */
-        if (is_ATI1_ATI2(This->base.info.format)) {
+        if (is_ATI1_ATI2(format)) {
             pLockedRect->Pitch = This->desc.Width;
-            pLockedRect->pBits = This->data + box.y * This->desc.Width + box.x;
+            pLockedRect->pBits = data + box.y * This->desc.Width + box.x;
         } else {
-            pLockedRect->Pitch = This->stride;
-            pLockedRect->pBits = This->data +
-                NineSurface9_GetSystemMemOffset(This->base.info.format,
-                                                This->stride,
+            pLockedRect->Pitch = stride;
+            pLockedRect->pBits = data +
+                NineSurface9_GetSystemMemOffset(format,
+                                                stride,
                                                 box.x,
                                                 box.y);
         }

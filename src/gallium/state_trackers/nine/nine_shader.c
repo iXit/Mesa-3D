@@ -2463,11 +2463,11 @@ DECL_SPECIAL(TEXBEM)
 {
     struct ureg_program *ureg = tx->ureg;
     struct ureg_dst dst = tx_dst_param(tx, &tx->insn.dst[0]);
+    struct ureg_src src = tx_src_param(tx, &tx->insn.src[0]); /* t[n] */
     struct ureg_dst tmp, tmp2, texcoord;
     struct ureg_src sample, m00, m01, m10, m11;
     struct ureg_src bumpenvlscale, bumpenvloffset;
     const int m = tx->insn.dst[0].idx;
-    const int n = tx->insn.src[0].idx;
 
     assert(tx->version.major == 1);
 
@@ -2505,18 +2505,18 @@ DECL_SPECIAL(TEXBEM)
 
     /* u' = TextureCoordinates(stage m)u + D3DTSS_BUMPENVMAT00(stage m)*t(n)R  */
     ureg_MAD(ureg, ureg_writemask(tmp, TGSI_WRITEMASK_X), m00,
-             NINE_APPLY_SWIZZLE(ureg_src(tx->regs.tS[n]), X), ureg_src(texcoord));
+             NINE_APPLY_SWIZZLE(src, X), ureg_src(texcoord));
     /* u' = u' + D3DTSS_BUMPENVMAT10(stage m)*t(n)G */
     ureg_MAD(ureg, ureg_writemask(tmp, TGSI_WRITEMASK_X), m10,
-             NINE_APPLY_SWIZZLE(ureg_src(tx->regs.tS[n]), Y),
+             NINE_APPLY_SWIZZLE(src, Y),
              NINE_APPLY_SWIZZLE(ureg_src(tmp), X));
 
     /* v' = TextureCoordinates(stage m)v + D3DTSS_BUMPENVMAT01(stage m)*t(n)R */
     ureg_MAD(ureg, ureg_writemask(tmp, TGSI_WRITEMASK_Y), m01,
-             NINE_APPLY_SWIZZLE(ureg_src(tx->regs.tS[n]), X), ureg_src(texcoord));
+             NINE_APPLY_SWIZZLE(src, X), ureg_src(texcoord));
     /* v' = v' + D3DTSS_BUMPENVMAT11(stage m)*t(n)G*/
     ureg_MAD(ureg, ureg_writemask(tmp, TGSI_WRITEMASK_Y), m11,
-             NINE_APPLY_SWIZZLE(ureg_src(tx->regs.tS[n]), Y),
+             NINE_APPLY_SWIZZLE(src, Y),
              NINE_APPLY_SWIZZLE(ureg_src(tmp), Y));
 
     /* Now the texture coordinates are in tmp.xy */
@@ -2526,7 +2526,7 @@ DECL_SPECIAL(TEXBEM)
     } else if (tx->insn.opcode == D3DSIO_TEXBEML) {
         /* t(m)RGBA = t(m)RGBA * [(t(n)B * D3DTSS_BUMPENVLSCALE(stage m)) + D3DTSS_BUMPENVLOFFSET(stage m)] */
         ureg_TEX(ureg, tmp, ps1x_sampler_type(tx->info, m), ureg_src(tmp), sample);
-        ureg_MAD(ureg, tmp2, NINE_APPLY_SWIZZLE(ureg_src(tx->regs.tS[n]), Z),
+        ureg_MAD(ureg, tmp2, NINE_APPLY_SWIZZLE(src, Z),
                  bumpenvlscale, bumpenvloffset);
         ureg_MUL(ureg, dst, ureg_src(tmp), ureg_src(tmp2));
     }
@@ -2540,6 +2540,7 @@ DECL_SPECIAL(TEXREG2AR)
 {
     struct ureg_program *ureg = tx->ureg;
     struct ureg_dst dst = tx_dst_param(tx, &tx->insn.dst[0]);
+    struct ureg_src src = tx_src_param(tx, &tx->insn.src[0]); /* t[n] */
     struct ureg_src sample;
     const int m = tx->insn.dst[0].idx;
     const int n = tx->insn.src[0].idx;
@@ -2547,7 +2548,7 @@ DECL_SPECIAL(TEXREG2AR)
 
     sample = ureg_DECL_sampler(ureg, m);
     tx->info->sampler_mask |= 1 << m;
-    ureg_TEX(ureg, dst, ps1x_sampler_type(tx->info, m), ureg_swizzle(ureg_src(tx->regs.tS[n]), NINE_SWIZZLE4(W,X,X,X)), sample);
+    ureg_TEX(ureg, dst, ps1x_sampler_type(tx->info, m), ureg_swizzle(src, NINE_SWIZZLE4(W,X,X,X)), sample);
 
     return D3D_OK;
 }
@@ -2556,6 +2557,7 @@ DECL_SPECIAL(TEXREG2GB)
 {
     struct ureg_program *ureg = tx->ureg;
     struct ureg_dst dst = tx_dst_param(tx, &tx->insn.dst[0]);
+    struct ureg_src src = tx_src_param(tx, &tx->insn.src[0]); /* t[n] */
     struct ureg_src sample;
     const int m = tx->insn.dst[0].idx;
     const int n = tx->insn.src[0].idx;
@@ -2563,7 +2565,7 @@ DECL_SPECIAL(TEXREG2GB)
 
     sample = ureg_DECL_sampler(ureg, m);
     tx->info->sampler_mask |= 1 << m;
-    ureg_TEX(ureg, dst, ps1x_sampler_type(tx->info, m), ureg_swizzle(ureg_src(tx->regs.tS[n]), NINE_SWIZZLE4(Y,Z,Z,Z)), sample);
+    ureg_TEX(ureg, dst, ps1x_sampler_type(tx->info, m), ureg_swizzle(src, NINE_SWIZZLE4(Y,Z,Z,Z)), sample);
 
     return D3D_OK;
 }
@@ -2577,6 +2579,7 @@ DECL_SPECIAL(TEXM3x2TEX)
 {
     struct ureg_program *ureg = tx->ureg;
     struct ureg_dst dst = tx_dst_param(tx, &tx->insn.dst[0]);
+    struct ureg_src src = tx_src_param(tx, &tx->insn.src[0]); /* t[n] */
     struct ureg_src sample;
     const int m = tx->insn.dst[0].idx - 1;
     const int n = tx->insn.src[0].idx;
@@ -2586,8 +2589,8 @@ DECL_SPECIAL(TEXM3x2TEX)
     tx_texcoord_alloc(tx, m+1);
 
     /* performs the matrix multiplication */
-    ureg_DP3(ureg, ureg_writemask(dst, TGSI_WRITEMASK_X), tx->regs.vT[m], ureg_src(tx->regs.tS[n]));
-    ureg_DP3(ureg, ureg_writemask(dst, TGSI_WRITEMASK_Y), tx->regs.vT[m+1], ureg_src(tx->regs.tS[n]));
+    ureg_DP3(ureg, ureg_writemask(dst, TGSI_WRITEMASK_X), tx->regs.vT[m], src);
+    ureg_DP3(ureg, ureg_writemask(dst, TGSI_WRITEMASK_Y), tx->regs.vT[m+1], src);
 
     sample = ureg_DECL_sampler(ureg, m + 1);
     tx->info->sampler_mask |= 1 << (m + 1);
@@ -2605,6 +2608,7 @@ DECL_SPECIAL(TEXM3x3SPEC)
 {
     struct ureg_program *ureg = tx->ureg;
     struct ureg_dst dst = tx_dst_param(tx, &tx->insn.dst[0]);
+    struct ureg_src src = tx_src_param(tx, &tx->insn.src[0]); /* t[n] */
     struct ureg_src E = tx_src_param(tx, &tx->insn.src[1]);
     struct ureg_src sample;
     struct ureg_dst tmp;
@@ -2616,9 +2620,9 @@ DECL_SPECIAL(TEXM3x3SPEC)
     tx_texcoord_alloc(tx, m+1);
     tx_texcoord_alloc(tx, m+2);
 
-    ureg_DP3(ureg, ureg_writemask(dst, TGSI_WRITEMASK_X), tx->regs.vT[m], ureg_src(tx->regs.tS[n]));
-    ureg_DP3(ureg, ureg_writemask(dst, TGSI_WRITEMASK_Y), tx->regs.vT[m+1], ureg_src(tx->regs.tS[n]));
-    ureg_DP3(ureg, ureg_writemask(dst, TGSI_WRITEMASK_Z), tx->regs.vT[m+2], ureg_src(tx->regs.tS[n]));
+    ureg_DP3(ureg, ureg_writemask(dst, TGSI_WRITEMASK_X), tx->regs.vT[m], src);
+    ureg_DP3(ureg, ureg_writemask(dst, TGSI_WRITEMASK_Y), tx->regs.vT[m+1], src);
+    ureg_DP3(ureg, ureg_writemask(dst, TGSI_WRITEMASK_Z), tx->regs.vT[m+2], src);
 
     sample = ureg_DECL_sampler(ureg, m + 2);
     tx->info->sampler_mask |= 1 << (m + 2);
@@ -2647,6 +2651,7 @@ DECL_SPECIAL(TEXREG2RGB)
 {
     struct ureg_program *ureg = tx->ureg;
     struct ureg_dst dst = tx_dst_param(tx, &tx->insn.dst[0]);
+    struct ureg_src src = tx_src_param(tx, &tx->insn.src[0]); /* t[n] */
     struct ureg_src sample;
     const int m = tx->insn.dst[0].idx;
     const int n = tx->insn.src[0].idx;
@@ -2654,7 +2659,7 @@ DECL_SPECIAL(TEXREG2RGB)
 
     sample = ureg_DECL_sampler(ureg, m);
     tx->info->sampler_mask |= 1 << m;
-    ureg_TEX(ureg, dst, ps1x_sampler_type(tx->info, m), ureg_src(tx->regs.tS[n]), sample);
+    ureg_TEX(ureg, dst, ps1x_sampler_type(tx->info, m), src, sample);
 
     return D3D_OK;
 }
@@ -2663,6 +2668,7 @@ DECL_SPECIAL(TEXDP3TEX)
 {
     struct ureg_program *ureg = tx->ureg;
     struct ureg_dst dst = tx_dst_param(tx, &tx->insn.dst[0]);
+    struct ureg_src src = tx_src_param(tx, &tx->insn.src[0]); /* t[n] */
     struct ureg_dst tmp;
     struct ureg_src sample;
     const int m = tx->insn.dst[0].idx;
@@ -2672,7 +2678,7 @@ DECL_SPECIAL(TEXDP3TEX)
     tx_texcoord_alloc(tx, m);
 
     tmp = tx_scratch(tx);
-    ureg_DP3(ureg, ureg_writemask(tmp, TGSI_WRITEMASK_X), tx->regs.vT[m], ureg_src(tx->regs.tS[n]));
+    ureg_DP3(ureg, ureg_writemask(tmp, TGSI_WRITEMASK_X), tx->regs.vT[m], src);
     ureg_MOV(ureg, ureg_writemask(tmp, TGSI_WRITEMASK_YZ), ureg_imm1f(ureg, 0.0f));
 
     sample = ureg_DECL_sampler(ureg, m);
@@ -2685,6 +2691,7 @@ DECL_SPECIAL(TEXDP3TEX)
 DECL_SPECIAL(TEXM3x2DEPTH)
 {
     struct ureg_program *ureg = tx->ureg;
+    struct ureg_src src = tx_src_param(tx, &tx->insn.src[0]); /* t[n] */
     struct ureg_dst tmp;
     const int m = tx->insn.dst[0].idx - 1;
     const int n = tx->insn.src[0].idx;
@@ -2696,8 +2703,8 @@ DECL_SPECIAL(TEXM3x2DEPTH)
     tmp = tx_scratch(tx);
 
     /* performs the matrix multiplication */
-    ureg_DP3(ureg, ureg_writemask(tmp, TGSI_WRITEMASK_X), tx->regs.vT[m], ureg_src(tx->regs.tS[n]));
-    ureg_DP3(ureg, ureg_writemask(tmp, TGSI_WRITEMASK_Y), tx->regs.vT[m+1], ureg_src(tx->regs.tS[n]));
+    ureg_DP3(ureg, ureg_writemask(tmp, TGSI_WRITEMASK_X), tx->regs.vT[m], src);
+    ureg_DP3(ureg, ureg_writemask(tmp, TGSI_WRITEMASK_Y), tx->regs.vT[m+1], src);
 
     ureg_RCP(ureg, ureg_writemask(tmp, TGSI_WRITEMASK_Z), ureg_scalar(ureg_src(tmp), TGSI_SWIZZLE_Y));
     /* tmp.x = 'z', tmp.y = 'w', tmp.z = 1/'w'. */
@@ -2717,13 +2724,14 @@ DECL_SPECIAL(TEXDP3)
 {
     struct ureg_program *ureg = tx->ureg;
     struct ureg_dst dst = tx_dst_param(tx, &tx->insn.dst[0]);
+    struct ureg_src src = tx_src_param(tx, &tx->insn.src[0]); /* t[n] */
     const int m = tx->insn.dst[0].idx;
     const int n = tx->insn.src[0].idx;
     assert(m >= 0 && m > n);
 
     tx_texcoord_alloc(tx, m);
 
-    ureg_DP3(ureg, dst, tx->regs.vT[m], ureg_src(tx->regs.tS[n]));
+    ureg_DP3(ureg, dst, tx->regs.vT[m], src);
 
     return D3D_OK;
 }
@@ -2732,6 +2740,7 @@ DECL_SPECIAL(TEXM3x3)
 {
     struct ureg_program *ureg = tx->ureg;
     struct ureg_dst dst = tx_dst_param(tx, &tx->insn.dst[0]);
+    struct ureg_src src = tx_src_param(tx, &tx->insn.src[0]); /* t[n] */
     struct ureg_src sample;
     struct ureg_dst E, tmp;
     const int m = tx->insn.dst[0].idx - 2;
@@ -2742,9 +2751,9 @@ DECL_SPECIAL(TEXM3x3)
     tx_texcoord_alloc(tx, m+1);
     tx_texcoord_alloc(tx, m+2);
 
-    ureg_DP3(ureg, ureg_writemask(dst, TGSI_WRITEMASK_X), tx->regs.vT[m], ureg_src(tx->regs.tS[n]));
-    ureg_DP3(ureg, ureg_writemask(dst, TGSI_WRITEMASK_Y), tx->regs.vT[m+1], ureg_src(tx->regs.tS[n]));
-    ureg_DP3(ureg, ureg_writemask(dst, TGSI_WRITEMASK_Z), tx->regs.vT[m+2], ureg_src(tx->regs.tS[n]));
+    ureg_DP3(ureg, ureg_writemask(dst, TGSI_WRITEMASK_X), tx->regs.vT[m], src);
+    ureg_DP3(ureg, ureg_writemask(dst, TGSI_WRITEMASK_Y), tx->regs.vT[m+1], src);
+    ureg_DP3(ureg, ureg_writemask(dst, TGSI_WRITEMASK_Z), tx->regs.vT[m+2], src);
 
     switch (tx->insn.opcode) {
     case D3DSIO_TEXM3x3:

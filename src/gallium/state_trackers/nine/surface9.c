@@ -394,15 +394,15 @@ NineSurface9_AddDirtyRect( struct NineSurface9 *This,
     }
 }
 
-static inline uint8_t *
-NineSurface9_GetSystemMemPointer(struct NineSurface9 *This, int x, int y)
+static inline unsigned
+NineSurface9_GetSystemMemOffset(enum pipe_format format, unsigned stride,
+                                int x, int y)
 {
-    unsigned x_offset = util_format_get_stride(This->base.info.format, x);
+    unsigned x_offset = util_format_get_stride(format, x);
 
-    y = util_format_get_nblocksy(This->base.info.format, y);
+    y = util_format_get_nblocksy(format, y);
 
-    assert(This->data);
-    return This->data + (y * This->stride + x_offset);
+    return y * stride + x_offset;
 }
 
 HRESULT NINE_WINAPI
@@ -497,9 +497,11 @@ NineSurface9_LockRect( struct NineSurface9 *This,
             pLockedRect->pBits = This->data + box.y * This->desc.Width + box.x;
         } else {
             pLockedRect->Pitch = This->stride;
-            pLockedRect->pBits = NineSurface9_GetSystemMemPointer(This,
-                                                                  box.x,
-                                                                  box.y);
+            pLockedRect->pBits = This->data +
+                NineSurface9_GetSystemMemOffset(This->base.info.format,
+                                                This->stride,
+                                                box.x,
+                                                box.y);
         }
     } else {
         bool no_refs = !p_atomic_read(&This->base.base.bind) &&
@@ -721,7 +723,7 @@ NineSurface9_CopyDefaultToMem( struct NineSurface9 *This,
     p_src = pipe->transfer_map(pipe, r_src, From->level,
                                PIPE_TRANSFER_READ,
                                &src_box, &transfer);
-    p_dst = NineSurface9_GetSystemMemPointer(This, 0, 0);
+    p_dst = This->data;
 
     assert (p_src && p_dst);
 

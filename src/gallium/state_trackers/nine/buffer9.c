@@ -276,7 +276,7 @@ NineBuffer9_Lock( struct NineBuffer9 *This,
      * Our tests: SYSTEMMEM doesn't DISCARD */
 
     if (This->base.pool == D3DPOOL_SYSTEMMEM)
-        Flags &= ~D3DLOCK_DISCARD;
+        Flags &= ~(D3DLOCK_DISCARD | D3DLOCK_NOOVERWRITE);
 
     if (Flags & D3DLOCK_DISCARD)
         usage = PIPE_TRANSFER_WRITE | PIPE_TRANSFER_DISCARD_WHOLE_RESOURCE;

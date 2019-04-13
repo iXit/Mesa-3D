@@ -1807,14 +1807,19 @@ DECL_SPECIAL(SINCOS)
     struct ureg_program *ureg = tx->ureg;
     struct ureg_dst dst = tx_dst_param(tx, &tx->insn.dst[0]);
     struct ureg_src src = tx_src_param(tx, &tx->insn.src[0]);
+    struct ureg_dst tmp = tx_scratch_scalar(tx);
 
     assert(!(dst.WriteMask & 0xc));
 
+    /* Copying to a temporary register avoids src/dst aliasing.
+     * src is supposed to have replicated swizzle. */
+    ureg_MOV(ureg, tmp, src);
+
     /* z undefined, w untouched */
     ureg_COS(ureg, ureg_writemask(dst, TGSI_WRITEMASK_X),
-             ureg_scalar(src, TGSI_SWIZZLE_X));
+             tx_src_scalar(tmp));
     ureg_SIN(ureg, ureg_writemask(dst, TGSI_WRITEMASK_Y),
-             ureg_scalar(src, TGSI_SWIZZLE_X));
+             tx_src_scalar(tmp));
     return D3D_OK;
 }
 

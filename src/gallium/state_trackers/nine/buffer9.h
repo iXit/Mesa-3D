@@ -56,6 +56,7 @@ struct NineBuffer9
     /* Whether only discard and nooverwrite were used so far
      * for this buffer. Allows some optimization. */
     boolean discard_nooverwrite_only;
+    boolean need_sync_if_nooverwrite;
     struct nine_subbuffer *buf;
 
     /* Specific to managed buffers */

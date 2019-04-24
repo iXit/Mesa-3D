@@ -283,7 +283,12 @@ NineBuffer9_Lock( struct NineBuffer9 *This,
     else if (Flags & D3DLOCK_NOOVERWRITE)
         usage = PIPE_TRANSFER_WRITE | PIPE_TRANSFER_UNSYNCHRONIZED;
     else
-        usage = PIPE_TRANSFER_READ_WRITE;
+        /* Do not ask for READ if writeonly and default pool (should be safe enough,
+         * as the doc says app shouldn't expect reading to work with writeonly).
+         * Ignore for Systemmem as it has special behaviours. */
+        usage = ((This->base.usage & D3DUSAGE_WRITEONLY) && This->base.pool == D3DPOOL_DEFAULT) ?
+            PIPE_TRANSFER_WRITE :
+            PIPE_TRANSFER_READ_WRITE;
     if (Flags & D3DLOCK_DONOTWAIT && !(This->base.usage & D3DUSAGE_DYNAMIC))
         usage |= PIPE_TRANSFER_DONTBLOCK;
 

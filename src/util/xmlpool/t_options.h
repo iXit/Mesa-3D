@@ -329,6 +329,11 @@ DRI_CONF_OPT_BEGIN_B(dynamic_texture_workaround, def) \
         DRI_CONF_DESC(en,gettext("If set to true, use a ram intermediate buffer for dynamic textures. Increases ram usage, which can cause out of memory issues, but can fix glitches for some games.")) \
 DRI_CONF_OPT_END
 
+#define DRI_CONF_NINE_SHADERINLINECONSTANTS(def) \
+DRI_CONF_OPT_BEGIN_B(shader_inline_constants, def) \
+        DRI_CONF_DESC(en,gettext("If set to true, recompile shaders with integer or boolean constants when the values are known. Can cause stutter, but can increase slightly performance.")) \
+DRI_CONF_OPT_END
+
 /**
  * \brief radeonsi specific configuration options
  */

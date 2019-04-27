@@ -60,6 +60,7 @@ DRI_CONF_BEGIN
         DRI_CONF_NINE_TEARFREEDISCARD("false")
         DRI_CONF_NINE_CSMT(-1)
         DRI_CONF_NINE_DYNAMICTEXTUREWORKAROUND("false")
+        DRI_CONF_NINE_SHADERINLINECONSTANTS("false")
     DRI_CONF_SECTION_END
 DRI_CONF_END;
 
@@ -303,6 +304,11 @@ drm_create_adapter( int fd,
         ctx->base.dynamic_texture_workaround = driQueryOptionb(&userInitOptions, "dynamic_texture_workaround");
     else
         ctx->base.dynamic_texture_workaround = FALSE;
+
+    if (driCheckOption(&userInitOptions, "shader_inline_constants", DRI_BOOL))
+        ctx->base.shader_inline_constants = driQueryOptionb(&userInitOptions, "shader_inline_constants");
+    else
+        ctx->base.shader_inline_constants = FALSE;
 
     driDestroyOptionCache(&userInitOptions);
     driDestroyOptionInfo(&defaultInitOptions);

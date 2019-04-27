@@ -491,9 +491,10 @@ NineDevice9_ctor( struct NineDevice9 *This,
     This->driver_caps.ps_integer = pScreen->get_shader_param(pScreen, PIPE_SHADER_FRAGMENT, PIPE_SHADER_CAP_INTEGERS);
     This->driver_caps.offset_units_unscaled = GET_PCAP(POLYGON_OFFSET_UNITS_UNSCALED);
 
+    This->context.inline_constants = pCTX->shader_inline_constants;
     /* Code would be needed when integers are not available to correctly
      * handle the conversion of integer constants */
-    This->context.inline_constants = This->driver_caps.vs_integer && This->driver_caps.ps_integer;
+    This->context.inline_constants &= This->driver_caps.vs_integer && This->driver_caps.ps_integer;
 
     nine_ff_init(This); /* initialize fixed function code */
 

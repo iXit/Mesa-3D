@@ -958,6 +958,7 @@ NineSwapChain9_Present( struct NineSwapChain9 *This,
         return hr;
 
     if (This->base.device->minor_version_num > 2 &&
+        This->actx->discard_delayed_release &&
         This->params.SwapEffect == D3DSWAPEFFECT_DISCARD &&
         This->params.PresentationInterval == D3DPRESENT_INTERVAL_IMMEDIATE) {
         int next_buffer = -1;
@@ -1283,6 +1284,7 @@ NineSwapChain9_GetBackBufferCountForParams( struct NineSwapChain9 *This,
          * . Buffer scheduled kernel side to be next on screen.
          * . Last buffer sent. */
         if (This->base.device->minor_version_num > 2 &&
+            This->actx->discard_delayed_release &&
             pParams->PresentationInterval == D3DPRESENT_INTERVAL_IMMEDIATE) {
             if (This->actx->thread_submit && count < 4)
                 count = 4;

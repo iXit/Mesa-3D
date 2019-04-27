@@ -133,6 +133,13 @@ D3DWindowBuffer_release(struct NineSwapChain9 *This,
                         D3DWindowBuffer *present_handle)
 {
     int i;
+
+    /* IsBufferReleased API not available */
+    if (This->base.device->minor_version_num <= 2) {
+        ID3DPresent_DestroyD3DWindowBuffer(This->present, present_handle);
+        return;
+    }
+
     /* Add it to the 'pending release' list */
     for (i = 0; i < D3DPRESENT_BACK_BUFFERS_MAX_EX + 1; i++) {
         if (!This->present_handles_pending_release[i]) {
@@ -754,8 +761,11 @@ present( struct NineSwapChain9 *This,
     (void)target_depth;
 
     /* Can happen with old Wine (presentation can still succeed),
-     * or at window destruction. */
-    if (FAILED(hr) || target_width == 0 || target_height == 0) {
+     * or at window destruction.
+     * Also disable for very old wine as D3DWindowBuffer_release
+     * cannot do the DestroyD3DWindowBuffer workaround. */
+    if (FAILED(hr) || target_width == 0 || target_height == 0 ||
+        This->base.device->minor_version_num <= 2) {
         target_width = resource->width0;
         target_height = resource->height0;
     }

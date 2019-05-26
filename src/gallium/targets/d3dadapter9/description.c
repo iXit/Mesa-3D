@@ -49,15 +49,6 @@ struct card_lookup_table {
     const char *d3d9name;
 }
 cards_amd[] = {
-    {"GFX902",                      "AMD Radeon (TM) Vega 8 Graphics"},
-    {"GFX900",                      "Radeon RX Vega"},
-    {"POLARIS10",                   "Radeon (TM) RX 480 Graphics"},
-    {"POLARIS11",                   "Radeon(TM) RX 460 Graphics"},
-    {"FIJI",                        "AMD Radeon (TM) R9 Fury Series"},
-    {"TONGA",                       "AMD Radeon R9 285"},
-    {"CARRIZO",                     "AMD Radeon R7 Graphics"},
-    {"STONEY",                      "AMD Radeon R7 200 Series"},
-    {"ICELAND",                     "AMD Radeon R7 M265 Series"},
     {"HAWAII",                      "AMD Radeon R9 290"},
     {"KAVERI",                      "AMD Radeon(TM) R7 Graphics"},
     {"KABINI",                      "AMD Radeon HD 8400 / R3 Series"},
@@ -67,7 +58,6 @@ cards_amd[] = {
     {"TAHITI",                      "AMD Radeon HD 7900 Series"},
     {"PITCAIRN",                    "AMD Radeon HD 7800 Series"},
     {"CAPE VERDE",                  "AMD Radeon HD 7700 Series"},
-    {"VERDE",                       "AMD Radeon HD 7700 Series"},
     {"ARUBA",                       "AMD Radeon HD 7660D"},
     {"CAYMAN",                      "AMD Radeon HD 6900 Series"},
     {"BARTS",                       "AMD Radeon HD 6800 Series"},
@@ -128,14 +118,7 @@ cards_amd[] = {
 },
 cards_nvidia[] =
 {
-    {"NV138",                       "NVIDIA GeForce GT 1030"},
-    {"NV137",                       "NVIDIA GeForce GTX 1050"},
-    {"NV136",                       "NVIDIA GeForce GTX 1060"},
-    {"NV134",                       "NVIDIA GeForce GTX 1080"},
-    {"NV132",                       "NVIDIA GeForce GTX 1080 Ti"},
-    {"NV126",                       "NVIDIA GeForce GTX 960"},
     {"NV124",                       "NVIDIA GeForce GTX 970"},
-    {"NV118",                       "NVIDIA GeForce 840M"},
     {"NV117",                       "NVIDIA GeForce GTX 750"},
     {"NVF1",                        "NVIDIA GeForce GTX 780 Ti"},
     {"NVF0",                        "NVIDIA GeForce GTX 780"},

@@ -1322,5 +1322,15 @@ NineSwapChain9_GetBackBufferCountForParams( struct NineSwapChain9 *This,
         }
     }
 
+    /* If we need to pageflip, two buffer can be insufficient to
+     * maintain rendering at the refresh rate. For example if one
+     * buffer is on screen, and we have just submitted a buffer,
+     * it is possible the rendering of the submitted buffer won't
+     * be ready for next pageflip. In the case, we will starve
+     * for buffers as the buffer on screen won't be released,
+     * and we end up at 30 fps. */
+    if (pParams->SwapEffect != D3DSWAPEFFECT_COPY && count < 3)
+        count = 3;
+
     return count;
 }

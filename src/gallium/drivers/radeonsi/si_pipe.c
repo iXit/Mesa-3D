@@ -1103,7 +1103,7 @@ static struct pipe_screen *radeonsi_screen_create_impl(struct radeon_winsys *ws,
    glsl_type_singleton_init_or_ref();
 
    if (!util_queue_init(
-          &sscreen->shader_compiler_queue, "sh", 64, num_comp_hi_threads,
+          &sscreen->shader_compiler_queue, "sh", 2, num_comp_hi_threads, // 64 les 2
           UTIL_QUEUE_INIT_RESIZE_IF_FULL | UTIL_QUEUE_INIT_SET_FULL_THREAD_AFFINITY)) {
       si_destroy_shader_cache(sscreen);
       FREE(sscreen);
@@ -1111,7 +1111,7 @@ static struct pipe_screen *radeonsi_screen_create_impl(struct radeon_winsys *ws,
       return NULL;
    }
 
-   if (!util_queue_init(&sscreen->shader_compiler_queue_low_priority, "shlo", 64,
+   if (!util_queue_init(&sscreen->shader_compiler_queue_low_priority, "shlo", 2,
                         num_comp_lo_threads,
                         UTIL_QUEUE_INIT_RESIZE_IF_FULL | UTIL_QUEUE_INIT_SET_FULL_THREAD_AFFINITY |
                            UTIL_QUEUE_INIT_USE_MINIMUM_PRIORITY)) {

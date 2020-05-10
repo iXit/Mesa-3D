@@ -39,6 +39,7 @@ NinePixelShader9_ctor( struct NinePixelShader9 *This,
     struct nine_shader_info info;
     struct pipe_context *pipe;
     HRESULT hr;
+    static unsigned total_byte_size = 0;
 
     DBG("This=%p pParams=%p pFunction=%p cso=%p\n", This, pParams, pFunction, cso);
 
@@ -78,6 +79,9 @@ NinePixelShader9_ctor( struct NinePixelShader9 *This,
     if (!This->byte_code.tokens)
         return E_OUTOFMEMORY;
     This->byte_code.size = info.byte_size;
+
+    total_byte_size += info.byte_size;
+    //fprintf(stderr, "nine: %d - %d\n", info.byte_size, (total_byte_size>>20));
 
     This->variant.cso = info.cso;
     This->variant.const_ranges = info.const_ranges;

@@ -163,6 +163,8 @@ static void *si_get_shader_binary(struct si_shader *shader)
    unsigned llvm_ir_size =
       shader->binary.llvm_ir_string ? strlen(shader->binary.llvm_ir_string) + 1 : 0;
 
+   static long long saved = 0;
+
    /* Refuse to allocate overly large buffers and guard against integer
     * overflow. */
    if (shader->binary.elf_size > UINT_MAX / 4 || llvm_ir_size > UINT_MAX / 4)
@@ -174,6 +176,9 @@ static void *si_get_shader_binary(struct si_shader *shader)
                    align(shader->binary.elf_size, 4) + 4 + align(llvm_ir_size, 4);
    void *buffer = CALLOC(1, size);
    uint32_t *ptr = (uint32_t *)buffer;
+
+   saved += size;
+   //fprintf(stderr, "%d / %d / %d\n", shader->binary.elf_size, llvm_ir_size, (int)(saved >> 20));
 
    if (!buffer)
       return NULL;
@@ -203,6 +208,8 @@ static bool si_load_shader_binary(struct si_shader *shader, void *binary)
    unsigned chunk_size;
    unsigned elf_size;
 
+   static long long loaded = 0;
+
    if (util_hash_crc32(ptr, size - 8) != crc32) {
       fprintf(stderr, "radeonsi: binary shader has invalid CRC32\n");
       return false;
@@ -213,6 +220,9 @@ static bool si_load_shader_binary(struct si_shader *shader, void *binary)
    ptr = read_chunk(ptr, (void **)&shader->binary.elf_buffer, &elf_size);
    shader->binary.elf_size = elf_size;
    ptr = read_chunk(ptr, (void **)&shader->binary.llvm_ir_string, &chunk_size);
+
+   loaded += size;
+   //fprintf(stderr, "%d + %d / %d\n", elf_size, chunk_size, (int)(loaded >> 20));
 
    return true;
 }

@@ -38,6 +38,14 @@
 
 #define DBG_CHANNEL DBG_TEXTURE
 
+#include <stdio.h>
+
+static long long texture_size = 0;
+
+int getTexture_size(void){
+    return (int)(texture_size >> 20);
+}
+
 static HRESULT
 NineTexture9_ctor( struct NineTexture9 *This,
                    struct NineUnknownParams *pParams,
@@ -169,6 +177,9 @@ NineTexture9_ctor( struct NineTexture9 *This,
             nine_format_get_size_and_offsets(pf, level_offsets,
                                              Width, Height,
                                              This->base.level_count-1));
+        texture_size += nine_format_get_size_and_offsets(pf, level_offsets,
+                                             Width, Height,
+                                             This->base.level_count-1);
         This->managed_buffer = user_buffer;
         if (!This->managed_buffer)
             return E_OUTOFMEMORY;
@@ -234,6 +245,12 @@ NineTexture9_dtor( struct NineTexture9 *This )
     }
 
     if (This->managed_buffer) {
+        unsigned *level_offsets;
+        level_offsets = alloca(sizeof(unsigned) * This->base.level_count);
+        texture_size -= nine_format_get_size_and_offsets(This->base.base.info.format, level_offsets,
+                                             This->base.base.info.width0, This->base.base.info.height0,
+                                             This->base.level_count-1);
+        fprintf(stderr, "DEALLOCATING RAM TEXTURE: %dMB\n", (int)(texture_size >> 20));
         if (is_worker)
             nine_free_worker(This->base.base.base.device->allocator, This->managed_buffer);
         else

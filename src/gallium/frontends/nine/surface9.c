@@ -43,6 +43,10 @@
 #include "util/u_inlines.h"
 #include "util/u_surface.h"
 
+#include <stdio.h>
+
+static long long surface_size = 0;
+
 #define DBG_CHANNEL DBG_SURFACE
 
 static void
@@ -159,6 +163,10 @@ NineSurface9_ctor( struct NineSurface9 *This,
                                              pDesc->Width,
                                              pDesc->Height,
                                              0));
+        surface_size += nine_format_get_level_alloc_size(This->format_internal,
+                                             pDesc->Width,
+                                             pDesc->Height,
+                                             0);
         if (!This->data_internal)
             return E_OUTOFMEMORY;
         This->stride_internal = nine_format_get_stride(This->format_internal,
@@ -173,6 +181,11 @@ NineSurface9_ctor( struct NineSurface9 *This,
                                              pDesc->Width,
                                              pDesc->Height,
                                              0));
+        surface_size += nine_format_get_level_alloc_size(This->base.info.format,
+                                             pDesc->Width,
+                                             pDesc->Height,
+                                             0);
+        fprintf(stderr, "ALLOCATING RAM SURFACE: %dMB\n", (int)(surface_size >> 20));
         if (!This->data)
             return E_OUTOFMEMORY;
     }
@@ -242,12 +255,23 @@ NineSurface9_dtor( struct NineSurface9 *This )
             nine_free_worker(This->base.base.device->allocator, This->data);
         else
             nine_free(This->base.base.device->allocator, This->data);
+        if (!This->base.base.container) {
+            fprintf(stderr, "DEALLOCATING RAM SURFACE: %dMB\n", (int)(surface_size >> 20));
+            surface_size -= nine_format_get_level_alloc_size(This->base.info.format,
+                                                 This->base.info.width0,
+                                                 This->base.info.height0,
+                                                 0);
+        }
     }
     if (This->data_internal) {
         if (is_worker)
             nine_free_worker(This->base.base.device->allocator, This->data_internal);
         else
             nine_free(This->base.base.device->allocator, This->data_internal);
+        surface_size -= nine_format_get_level_alloc_size(This->format_internal,
+                                             This->base.info.width0,
+                                             This->base.info.height0,
+                                             0);
     }
     NineResource9_dtor(&This->base);
 }

@@ -30,6 +30,9 @@
 
 #define DBG_CHANNEL DBG_CUBETEXTURE
 
+#include <stdio.h>
+
+static long long cubic_texture_size = 0;
 
 static HRESULT
 NineCubeTexture9_ctor( struct NineCubeTexture9 *This,
@@ -121,6 +124,8 @@ NineCubeTexture9_ctor( struct NineCubeTexture9 *This,
         face_size = nine_format_get_size_and_offsets(pf, level_offsets,
                                                      EdgeLength, EdgeLength,
                                                      This->base.level_count-1);
+        cubic_texture_size += 6 * face_size;
+        fprintf(stderr, "ALLOCATING RAM CUBETEXTURE: %dMB\n", (int)(cubic_texture_size >> 20));
         This->managed_buffer = nine_allocate(pParams->device->allocator, 6 * face_size);
         if (!This->managed_buffer)
             return E_OUTOFMEMORY;
@@ -185,10 +190,18 @@ NineCubeTexture9_dtor( struct NineCubeTexture9 *This )
     }
 
     if (This->managed_buffer) {
+        unsigned *level_offsets = alloca(sizeof(unsigned) * This->base.level_count);
+        unsigned face_size = 0;
         if (is_worker)
             nine_free_worker(This->base.base.base.device->allocator, This->managed_buffer);
         else
             nine_free(This->base.base.base.device->allocator, This->managed_buffer);
+
+        face_size = nine_format_get_size_and_offsets(This->base.base.info.format, level_offsets,
+                                                     This->base.base.info.width0, This->base.base.info.height0,
+                                                     This->base.level_count-1);
+        cubic_texture_size -= 6 * face_size;
+        fprintf(stderr, "DEALLOCATING RAM CUBETEXTURE: %dMB\n", (int)(cubic_texture_size >> 20));
     }
 
     NineBaseTexture9_dtor(&This->base);

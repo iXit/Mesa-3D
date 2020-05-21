@@ -33,6 +33,9 @@
 
 #define DBG_CHANNEL DBG_VOLUME
 
+#include <stdio.h>
+
+static long long volume_texture_size = 0;
 
 static HRESULT
 NineVolume9_AllocateData( struct NineVolume9 *This )
@@ -43,6 +46,8 @@ NineVolume9_AllocateData( struct NineVolume9 *This )
         This->base.container, This, This->level, size);
 
     This->data = (uint8_t *)align_calloc(size, 32);
+    volume_texture_size += size;
+    fprintf(stderr, "ALLOCATING RAM VOLUME: %dMB\n", (int)(volume_texture_size >> 20));
     if (!This->data)
         return E_OUTOFMEMORY;
     return D3D_OK;
@@ -129,6 +134,7 @@ NineVolume9_ctor( struct NineVolume9 *This,
                                                                 pDesc->Height);
         This->data_internal = align_calloc(This->layer_stride_internal *
                                              This->desc.Depth, 32);
+        volume_texture_size += This->layer_stride_internal * This->desc.Depth;
         if (!This->data_internal)
             return E_OUTOFMEMORY;
     }
@@ -158,10 +164,15 @@ NineVolume9_dtor( struct NineVolume9 *This )
     if (p_atomic_read(&This->pending_uploads_counter))
         nine_csmt_process(This->base.device);
 
-    if (This->data)
+    if (This->data) {
         align_free(This->data);
-    if (This->data_internal)
+        volume_texture_size -= This->layer_stride * This->desc.Depth;
+        fprintf(stderr, "DEALLOCATING RAM VOLUME: %dMB\n", (int)(volume_texture_size >> 20));
+    }
+    if (This->data_internal) {
+        volume_texture_size -= This->layer_stride_internal * This->desc.Depth;
         align_free(This->data_internal);
+    }
 
     pipe_resource_reference(&This->resource, NULL);
 

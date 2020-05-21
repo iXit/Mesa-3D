@@ -35,8 +35,11 @@
 #include "pipe/p_format.h"
 #include "util/u_box.h"
 #include "util/u_inlines.h"
+#include <stdio.h>
 
 #define DBG_CHANNEL (DBG_INDEXBUFFER|DBG_VERTEXBUFFER)
+
+static long long buffer_size = 0;
 
 HRESULT
 NineBuffer9_ctor( struct NineBuffer9 *This,
@@ -163,6 +166,9 @@ NineBuffer9_ctor( struct NineBuffer9 *This,
         This->managed.data = align_calloc(
             nine_format_get_level_alloc_size(This->base.info.format,
                                              Size, 1, 0), 32);
+        buffer_size += nine_format_get_level_alloc_size(This->base.info.format,
+                                             Size, 1, 0);
+        fprintf(stderr, "ALLOCATING MANAGED BUFFER: %dMB\n", (int)(buffer_size >> 20));
         if (!This->managed.data)
             return E_OUTOFMEMORY;
         This->managed.dirty = TRUE;
@@ -194,8 +200,12 @@ NineBuffer9_dtor( struct NineBuffer9 *This )
     }
 
     if (This->base.pool != D3DPOOL_DEFAULT) {
-        if (This->managed.data)
+        if (This->managed.data) {
             align_free(This->managed.data);
+            buffer_size -= nine_format_get_level_alloc_size(This->base.info.format,
+                                             This->base.info.width0, 1, 0);
+            fprintf(stderr, "DEALLOCATING MANAGED BUFFER: %dMB\n", (int)(buffer_size >> 20));
+        }
         if (list_is_linked(&This->managed.list))
             list_del(&This->managed.list);
         if (list_is_linked(&This->managed.list2))

@@ -40,6 +40,8 @@ NineTexture9( void *data )
     return (struct NineTexture9 *)data;
 }
 
+int getTexture_size(void);
+
 HRESULT
 NineTexture9_new( struct NineDevice9 *pDevice,
                   UINT Width, UINT Height, UINT Levels,

@@ -215,7 +215,7 @@ nine_upload_create_buffer(struct nine_buffer_upload *upload,
         resource.format = PIPE_FORMAT_R8_UNORM;
         resource.bind = PIPE_BIND_VERTEX_BUFFER;
         resource.usage = PIPE_USAGE_STREAM;
-        resource.width0 = buffer_size;
+        resource.width0 = size;
         resource.height0 = 1;
         resource.depth0 = 1;
         resource.array_size = 1;
@@ -229,7 +229,7 @@ nine_upload_create_buffer(struct nine_buffer_upload *upload,
         }
 
         buf->map = pipe_buffer_map_range(upload->pipe, buf->resource,
-                                         0, buffer_size,
+                                         0, size,
                                          PIPE_MAP_WRITE |
 #ifdef PIPE_ARCH_X86
                                          PIPE_MAP_ONCE |

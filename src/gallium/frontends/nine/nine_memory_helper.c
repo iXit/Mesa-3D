@@ -114,6 +114,9 @@
 #define NINE_ENABLE_MEMFD
 #endif
 
+#define DEBUG
+#define NINE_ENABLE_MEMFD
+
 #ifdef NINE_ENABLE_MEMFD
 
 struct nine_memfd_file_region {

@@ -104,7 +104,7 @@ NineBuffer9_Upload( struct NineBuffer9 *This )
 {
     struct NineDevice9 *device = This->base.base.device;
 
-    assert(This->base.pool == D3DPOOL_MANAGED && This->managed.dirty);
+    assert(This->base.pool != D3DPOOL_DEFAULT && This->managed.dirty);
     nine_context_range_upload(device, &This->managed.pending_upload,
                               (struct NineUnknown *)This,
                               This->base.resource,

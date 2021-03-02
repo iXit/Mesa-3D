@@ -83,10 +83,11 @@ NineBuffer9_ctor( struct NineBuffer9 *This,
      *   vram copy are involved or not).
      *   DEFAULT + WRITEONLY => Vram
      *   DEFAULT + WRITEONLY + DYNAMIC => Either Vram buffer or GTT_WC, depending on what the driver wants.
+     *   SYSTEMMEM: Same as MANAGED, but handled by the driver instead of the runtime (which means
+     *   some small behavior differences between vendors). Implementing exactly as MANAGED should
+     *   be fine.
      */
-    if (Pool == D3DPOOL_SYSTEMMEM)
-        info->usage = PIPE_USAGE_STAGING;
-    else if (Pool == D3DPOOL_MANAGED)
+    if (Pool != D3DPOOL_DEFAULT)
         info->usage = PIPE_USAGE_DEFAULT;
     else if (Usage & D3DUSAGE_DYNAMIC && Usage & D3DUSAGE_WRITEONLY)
         info->usage = PIPE_USAGE_STREAM;
@@ -130,7 +131,7 @@ NineBuffer9_ctor( struct NineBuffer9 *This,
     if (FAILED(hr))
         return hr;
 
-    if (Pool == D3DPOOL_MANAGED) {
+    if (Pool != D3DPOOL_DEFAULT) {
         This->managed.data = align_calloc(
             nine_format_get_level_alloc_size(This->base.info.format,
                                              Size, 1, 0), 32);
@@ -160,7 +161,7 @@ NineBuffer9_dtor( struct NineBuffer9 *This )
         FREE(This->maps);
     }
 
-    if (This->base.pool == D3DPOOL_MANAGED) {
+    if (This->base.pool != D3DPOOL_DEFAULT) {
         if (This->managed.data)
             align_free(This->managed.data);
         if (list_is_linked(&This->managed.list))
@@ -238,12 +239,12 @@ NineBuffer9_Lock( struct NineBuffer9 *This,
      * Since these buffers are supposed to be locked once and never
      * writen again (MANAGED or DYNAMIC is used for the other uses cases),
      * performance should be unaffected. */
-    if (!(This->base.usage & D3DUSAGE_DYNAMIC) && This->base.pool != D3DPOOL_MANAGED)
+    if (!(This->base.usage & D3DUSAGE_DYNAMIC) && This->base.pool == D3DPOOL_DEFAULT)
         SizeToLock = This->size - OffsetToLock;
 
     u_box_1d(OffsetToLock, SizeToLock, &box);
 
-    if (This->base.pool == D3DPOOL_MANAGED) {
+    if (This->base.pool != D3DPOOL_DEFAULT) {
         /* READONLY doesn't dirty the buffer */
         /* Tests on Win: READONLY doesn't wait for the upload */
         if (!(Flags & D3DLOCK_READONLY)) {
@@ -274,11 +275,7 @@ NineBuffer9_Lock( struct NineBuffer9 *This,
      * D3DERR_WASSTILLDRAWING if the resource is in use, except for DYNAMIC.
      * Our tests: some apps do use both DISCARD and NOOVERWRITE at the same
      * time. On windows it seems to return different pointer, thus indicating
-     * DISCARD is taken into account.
-     * Our tests: SYSTEMMEM doesn't DISCARD */
-
-    if (This->base.pool == D3DPOOL_SYSTEMMEM)
-        Flags &= ~(D3DLOCK_DISCARD | D3DLOCK_NOOVERWRITE);
+     * DISCARD is taken into account. */
 
     if (Flags & D3DLOCK_DISCARD)
         usage = PIPE_MAP_WRITE | PIPE_MAP_DISCARD_WHOLE_RESOURCE;
@@ -286,9 +283,8 @@ NineBuffer9_Lock( struct NineBuffer9 *This,
         usage = PIPE_MAP_WRITE | PIPE_MAP_UNSYNCHRONIZED;
     else
         /* Do not ask for READ if writeonly and default pool (should be safe enough,
-         * as the doc says app shouldn't expect reading to work with writeonly).
-         * Ignore for Systemmem as it has special behaviours. */
-        usage = ((This->base.usage & D3DUSAGE_WRITEONLY) && This->base.pool == D3DPOOL_DEFAULT) ?
+         * as the doc says app shouldn't expect reading to work with writeonly). */
+        usage = (This->base.usage & D3DUSAGE_WRITEONLY) ?
             PIPE_MAP_WRITE :
             PIPE_MAP_READ_WRITE;
     if (Flags & D3DLOCK_DONOTWAIT && !(This->base.usage & D3DUSAGE_DYNAMIC))
@@ -442,7 +438,7 @@ NineBuffer9_Unlock( struct NineBuffer9 *This )
     if (This->nlocks > 0)
         return D3D_OK; /* Pending unlocks. Wait all unlocks before unmapping */
 
-    if (This->base.pool != D3DPOOL_MANAGED) {
+    if (This->base.pool == D3DPOOL_DEFAULT) {
         for (i = 0; i < This->nmaps; i++) {
             if (!This->maps[i].buf) {
                 pipe = This->maps[i].is_pipe_secondary ?
@@ -465,7 +461,7 @@ NineBuffer9_Unlock( struct NineBuffer9 *This )
 void
 NineBuffer9_SetDirty( struct NineBuffer9 *This )
 {
-    assert(This->base.pool == D3DPOOL_MANAGED);
+    assert(This->base.pool != D3DPOOL_DEFAULT);
 
     This->managed.dirty = TRUE;
     u_box_1d(0, This->size, &This->managed.dirty_box);

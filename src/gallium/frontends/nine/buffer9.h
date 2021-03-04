@@ -99,18 +99,22 @@ NineBuffer9_Lock( struct NineBuffer9 *This,
 HRESULT NINE_WINAPI
 NineBuffer9_Unlock( struct NineBuffer9 *This );
 
+
 static inline void
 NineBuffer9_Upload( struct NineBuffer9 *This )
 {
     struct NineDevice9 *device = This->base.base.device;
+    /* Align the upload with the cache line (for WC)*/
+    int start = (This->managed.dirty_box.x/64)*64;
+    int upload_size = MIN2(This->size, ((This->managed.dirty_box.x+This->managed.dirty_box.width+63)/64)*64) - start;
 
     assert(This->base.pool != D3DPOOL_DEFAULT && This->managed.dirty);
     nine_context_range_upload(device, &This->managed.pending_upload,
                               (struct NineUnknown *)This,
                               This->base.resource,
-                              This->managed.dirty_box.x,
-                              This->managed.dirty_box.width,
-                              (char *)This->managed.data + This->managed.dirty_box.x);
+                              start,
+                              upload_size,
+                              (char *)This->managed.data + start);
     This->managed.dirty = FALSE;
 }
 

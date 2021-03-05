@@ -31,6 +31,7 @@
 #include "pipe/p_context.h"
 #include "pipe/p_state.h"
 #include "util/list.h"
+#include "util/u_box.h"
 
 struct pipe_screen;
 struct pipe_context;
@@ -63,7 +64,8 @@ struct NineBuffer9
     struct {
         void *data;
         boolean dirty;
-        struct pipe_box dirty_box;
+        struct pipe_box dirty_box; /* region in the resource to update */
+        struct pipe_box upload_pending_regions; /* region with uploads pending */
         struct list_head list; /* for update_buffers */
         struct list_head list2; /* for managed_buffers */
         unsigned pending_upload; /* for uploads */
@@ -109,6 +111,13 @@ NineBuffer9_Upload( struct NineBuffer9 *This )
     int upload_size = MIN2(This->size, ((This->managed.dirty_box.x+This->managed.dirty_box.width+63)/64)*64) - start;
 
     assert(This->base.pool != D3DPOOL_DEFAULT && This->managed.dirty);
+    if (This->managed.pending_upload) {
+        u_box_union_1d(&This->managed.upload_pending_regions,
+                       &This->managed.upload_pending_regions,
+                       &This->managed.dirty_box);
+    } else {
+        This->managed.upload_pending_regions = This->managed.dirty_box;
+    }
     nine_context_range_upload(device, &This->managed.pending_upload,
                               (struct NineUnknown *)This,
                               This->base.resource,

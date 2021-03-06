@@ -121,6 +121,36 @@ u_box_volume_3d(const struct pipe_box *box)
 
 /* Aliasing of @dst permitted. */
 static inline void
+u_box_union_1d(struct pipe_box *dst,
+               const struct pipe_box *a, const struct pipe_box *b)
+{
+   int x;
+
+   x = MIN2(a->x, b->x);
+
+   dst->width = MAX2(a->x + a->width, b->x + b->width) - x;
+   dst->x = x;
+}
+
+/* Aliasing of @dst permitted. */
+static inline void
+u_box_intersect_1d(struct pipe_box *dst,
+               const struct pipe_box *a, const struct pipe_box *b)
+{
+   int x;
+
+   x = MAX2(a->x, b->x);
+
+   dst->width = MIN2(a->x + a->width, b->x + b->width) - x;
+   dst->x = x;
+   if (dst->width <= 0) {
+      dst->x = 0;
+      dst->width = 0;
+   }
+}
+
+/* Aliasing of @dst permitted. */
+static inline void
 u_box_union_2d(struct pipe_box *dst,
                const struct pipe_box *a, const struct pipe_box *b)
 {

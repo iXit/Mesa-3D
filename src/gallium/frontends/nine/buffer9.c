@@ -68,7 +68,7 @@ NineBuffer9_ctor( struct NineBuffer9 *This,
 
     /* Note: WRITEONLY is just tip for resource placement, the resource
      * can still be read (but slower). */
-    info->bind = PIPE_BIND_VERTEX_BUFFER;
+    info->bind = (Type == D3DRTYPE_INDEXBUFFER) ? PIPE_BIND_INDEX_BUFFER : PIPE_BIND_VERTEX_BUFFER;
 
     /* It is hard to find clear information on where to place the buffer in
      * memory depending on the flag.

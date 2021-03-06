@@ -1545,6 +1545,13 @@ CSMT_ITEM_NO_WAIT(nine_context_set_stream_source_apply,
     struct nine_context *context = &device->context;
     const unsigned i = StreamNumber;
 
+    /* For normal draws, these tests are useless,
+     * but not for *Up draws */
+    if (context->vtxbuf[i].buffer.resource == res &&
+        context->vtxbuf[i].buffer_offset == OffsetInBytes &&
+        context->vtxbuf[i].stride == Stride)
+        return;
+
     context->vtxbuf[i].stride = Stride;
     context->vtxbuf[i].buffer_offset = OffsetInBytes;
     pipe_resource_reference(&context->vtxbuf[i].buffer.resource, res);

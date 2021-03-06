@@ -2966,6 +2966,7 @@ NineDevice9_DrawPrimitiveUP( struct NineDevice9 *This,
 {
     struct pipe_resource *resource = NULL;
     unsigned buffer_offset;
+    unsigned StartVertex = 0;
 
     DBG("iface %p, PrimitiveType %u, PrimitiveCount %u, data %p, stride %u\n",
         This, PrimitiveType, PrimitiveCount,
@@ -2978,18 +2979,25 @@ NineDevice9_DrawPrimitiveUP( struct NineDevice9 *This,
     u_upload_data(This->vertex_uploader,
                   0,
                   (prim_count_to_vertex_count(PrimitiveType, PrimitiveCount)) * VertexStreamZeroStride,
-                  64,
+                  1,
                   pVertexStreamZeroData,
                   &buffer_offset,
                   &resource);
     u_upload_unmap(This->vertex_uploader);
+
+    /* Optimization to skip changing the bound vertex buffer data
+     * for consecutive DrawPrimitiveUp with identical VertexStreamZeroStride */
+    if (VertexStreamZeroStride > 0) {
+        StartVertex = buffer_offset / VertexStreamZeroStride;
+        buffer_offset -= StartVertex * VertexStreamZeroStride;
+    }
 
     nine_context_set_stream_source_apply(This, 0, resource,
                                          buffer_offset, VertexStreamZeroStride);
     pipe_resource_reference(&resource, NULL);
 
     NineBeforeDraw(This);
-    nine_context_draw_primitive(This, PrimitiveType, 0, PrimitiveCount);
+    nine_context_draw_primitive(This, PrimitiveType, StartVertex, PrimitiveCount);
     NineAfterDraw(This);
 
     NineDevice9_PauseRecording(This);

@@ -512,7 +512,6 @@ NineDevice9_ctor( struct NineDevice9 *This,
 
     /* Allocate upload helper for drivers that suck (from st pov ;). */
 
-    This->driver_caps.user_vbufs = GET_PCAP(USER_VERTEX_BUFFERS) && !This->csmt_active;
     This->driver_caps.user_sw_vbufs = This->screen_sw->get_param(This->screen_sw, PIPE_CAP_USER_VERTEX_BUFFERS);
     This->vertex_uploader = This->csmt_active ? This->pipe_secondary->stream_uploader : This->context.pipe->stream_uploader;
     This->driver_caps.window_space_position_support = GET_PCAP(TGSI_VS_WINDOW_SPACE_POSITION);
@@ -2955,6 +2954,9 @@ NineDevice9_DrawIndexedPrimitive( struct NineDevice9 *This,
     return D3D_OK;
 }
 
+static void
+NineDevice9_SetStreamSourceNULL( struct NineDevice9 *This );
+
 HRESULT NINE_WINAPI
 NineDevice9_DrawPrimitiveUP( struct NineDevice9 *This,
                              D3DPRIMITIVETYPE PrimitiveType,
@@ -2962,7 +2964,8 @@ NineDevice9_DrawPrimitiveUP( struct NineDevice9 *This,
                              const void *pVertexStreamZeroData,
                              UINT VertexStreamZeroStride )
 {
-    struct pipe_vertex_buffer vtxbuf;
+    struct pipe_resource *resource = NULL;
+    unsigned buffer_offset;
 
     DBG("iface %p, PrimitiveType %u, PrimitiveCount %u, data %p, stride %u\n",
         This, PrimitiveType, PrimitiveCount,
@@ -2972,32 +2975,25 @@ NineDevice9_DrawPrimitiveUP( struct NineDevice9 *This,
                 D3DERR_INVALIDCALL);
     user_assert(PrimitiveCount, D3D_OK);
 
-    vtxbuf.stride = VertexStreamZeroStride;
-    vtxbuf.buffer_offset = 0;
-    vtxbuf.is_user_buffer = true;
-    vtxbuf.buffer.user = pVertexStreamZeroData;
+    u_upload_data(This->vertex_uploader,
+                  0,
+                  (prim_count_to_vertex_count(PrimitiveType, PrimitiveCount)) * VertexStreamZeroStride,
+                  64,
+                  pVertexStreamZeroData,
+                  &buffer_offset,
+                  &resource);
+    u_upload_unmap(This->vertex_uploader);
 
-    if (!This->driver_caps.user_vbufs) {
-        vtxbuf.is_user_buffer = false;
-        vtxbuf.buffer.resource = NULL;
-        u_upload_data(This->vertex_uploader,
-                      0,
-                      (prim_count_to_vertex_count(PrimitiveType, PrimitiveCount)) * VertexStreamZeroStride, /* XXX */
-                      4,
-                      pVertexStreamZeroData,
-                      &vtxbuf.buffer_offset,
-                      &vtxbuf.buffer.resource);
-        u_upload_unmap(This->vertex_uploader);
-    }
+    nine_context_set_stream_source_apply(This, 0, resource,
+                                         buffer_offset, VertexStreamZeroStride);
+    pipe_resource_reference(&resource, NULL);
 
     NineBeforeDraw(This);
-    nine_context_draw_primitive_from_vtxbuf(This, PrimitiveType, PrimitiveCount, &vtxbuf);
+    nine_context_draw_primitive(This, PrimitiveType, 0, PrimitiveCount);
     NineAfterDraw(This);
 
-    pipe_vertex_buffer_unreference(&vtxbuf);
-
     NineDevice9_PauseRecording(This);
-    NineDevice9_SetStreamSource(This, 0, NULL, 0, 0);
+    NineDevice9_SetStreamSourceNULL(This);
     NineDevice9_ResumeRecording(This);
 
     return D3D_OK;
@@ -3015,6 +3011,9 @@ NineDevice9_DrawIndexedPrimitiveUP( struct NineDevice9 *This,
                                     UINT VertexStreamZeroStride )
 {
     struct pipe_vertex_buffer vbuf;
+    unsigned index_size = (IndexDataFormat == D3DFMT_INDEX16) ? 2 : 4;
+    struct pipe_resource *ibuf = NULL;
+    unsigned base;
 
     DBG("iface %p, PrimitiveType %u, MinVertexIndex %u, NumVertices %u "
         "PrimitiveCount %u, pIndexData %p, IndexDataFormat %u "
@@ -3029,41 +3028,30 @@ NineDevice9_DrawIndexedPrimitiveUP( struct NineDevice9 *This,
                 IndexDataFormat == D3DFMT_INDEX32, D3DERR_INVALIDCALL);
     user_assert(PrimitiveCount, D3D_OK);
 
+    base = MinVertexIndex * VertexStreamZeroStride;
+    vbuf.is_user_buffer = false;
+    vbuf.buffer.resource = NULL;
     vbuf.stride = VertexStreamZeroStride;
-    vbuf.buffer_offset = 0;
-    vbuf.is_user_buffer = true;
-    vbuf.buffer.user = pVertexStreamZeroData;
-
-    unsigned index_size = (IndexDataFormat == D3DFMT_INDEX16) ? 2 : 4;
-    struct pipe_resource *ibuf = NULL;
-
-    if (!This->driver_caps.user_vbufs) {
-        const unsigned base = MinVertexIndex * VertexStreamZeroStride;
-        vbuf.is_user_buffer = false;
-        vbuf.buffer.resource = NULL;
-        u_upload_data(This->vertex_uploader,
-                      base,
-                      NumVertices * VertexStreamZeroStride, /* XXX */
-                      4,
-                      (const uint8_t *)pVertexStreamZeroData + base,
-                      &vbuf.buffer_offset,
-                      &vbuf.buffer.resource);
-        u_upload_unmap(This->vertex_uploader);
-        /* Won't be used: */
-        vbuf.buffer_offset -= base;
-    }
+    u_upload_data(This->vertex_uploader,
+                  base,
+                  NumVertices * VertexStreamZeroStride, /* XXX */
+                  64,
+                  (const uint8_t *)pVertexStreamZeroData + base,
+                  &vbuf.buffer_offset,
+                  &vbuf.buffer.resource);
+    u_upload_unmap(This->vertex_uploader);
+    /* Won't be used: */
+    vbuf.buffer_offset -= base;
 
     unsigned index_offset = 0;
-    if (This->csmt_active) {
-        u_upload_data(This->pipe_secondary->stream_uploader,
-                      0,
-                      (prim_count_to_vertex_count(PrimitiveType, PrimitiveCount)) * index_size,
-                      4,
-                      pIndexData,
-                      &index_offset,
-                      &ibuf);
-        u_upload_unmap(This->pipe_secondary->stream_uploader);
-    }
+    u_upload_data(This->pipe_secondary->stream_uploader,
+                  0,
+                  (prim_count_to_vertex_count(PrimitiveType, PrimitiveCount)) * index_size,
+                  64,
+                  pIndexData,
+                  &index_offset,
+                  &ibuf);
+    u_upload_unmap(This->pipe_secondary->stream_uploader);
 
     NineBeforeDraw(This);
     nine_context_draw_indexed_primitive_from_vtxbuf_idxbuf(This, PrimitiveType,
@@ -3082,7 +3070,7 @@ NineDevice9_DrawIndexedPrimitiveUP( struct NineDevice9 *This,
 
     NineDevice9_PauseRecording(This);
     NineDevice9_SetIndices(This, NULL);
-    NineDevice9_SetStreamSource(This, 0, NULL, 0, 0);
+    NineDevice9_SetStreamSourceNULL(This);
     NineDevice9_ResumeRecording(This);
 
     return D3D_OK;
@@ -3627,6 +3615,24 @@ NineDevice9_SetStreamSource( struct NineDevice9 *This,
                                    Stride);
 
     return D3D_OK;
+}
+
+static void
+NineDevice9_SetStreamSourceNULL( struct NineDevice9 *This )
+{
+    struct nine_state *state = This->update;
+
+    DBG("This=%p\n", This);
+
+    state->vtxbuf[0].stride = 0;
+    state->vtxbuf[0].buffer_offset = 0;
+
+    if (!state->stream[0])
+        return;
+
+    NineBindBufferToDevice(This,
+                           (struct NineBuffer9 **)&state->stream[0],
+                           NULL);
 }
 
 HRESULT NINE_WINAPI

@@ -128,7 +128,6 @@ struct NineDevice9
     } cursor;
 
     struct {
-        boolean user_vbufs;
         boolean user_sw_vbufs;
         boolean window_space_position_support;
         boolean vs_integer;

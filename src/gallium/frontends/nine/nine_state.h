@@ -354,6 +354,13 @@ struct NineDevice9;
  * thread can access struct nine_context. */
 
 void
+nine_context_set_stream_source_apply(struct NineDevice9 *device,
+                                    UINT StreamNumber,
+                                    struct pipe_resource *res,
+                                    UINT OffsetInBytes,
+                                    UINT Stride);
+
+void
 nine_context_set_render_state(struct NineDevice9 *device,
                               D3DRENDERSTATETYPE State,
                               DWORD Value);
@@ -513,12 +520,6 @@ nine_context_draw_indexed_primitive(struct NineDevice9 *device,
                                     UINT NumVertices,
                                     UINT StartIndex,
                                     UINT PrimitiveCount);
-
-void
-nine_context_draw_primitive_from_vtxbuf(struct NineDevice9 *device,
-                                        D3DPRIMITIVETYPE PrimitiveType,
-                                        UINT PrimitiveCount,
-                                        struct pipe_vertex_buffer *vtxbuf);
 
 void
 nine_context_draw_indexed_primitive_from_vtxbuf_idxbuf(struct NineDevice9 *device,

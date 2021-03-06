@@ -1390,12 +1390,6 @@ nine_context_set_texture_apply(struct NineDevice9 *device,
                                struct pipe_resource *res,
                                struct pipe_sampler_view *view0,
                                struct pipe_sampler_view *view1);
-static void
-nine_context_set_stream_source_apply(struct NineDevice9 *device,
-                                    UINT StreamNumber,
-                                    struct pipe_resource *res,
-                                    UINT OffsetInBytes,
-                                    UINT Stride);
 
 static void
 nine_context_set_indices_apply(struct NineDevice9 *device,
@@ -2410,30 +2404,6 @@ CSMT_ITEM_NO_WAIT(nine_context_draw_indexed_primitive,
     context->pipe->draw_vbo(context->pipe, &info, NULL, &draw, 1);
 }
 
-CSMT_ITEM_NO_WAIT(nine_context_draw_primitive_from_vtxbuf,
-                  ARG_VAL(D3DPRIMITIVETYPE, PrimitiveType),
-                  ARG_VAL(UINT, PrimitiveCount),
-                  ARG_BIND_VBUF(struct pipe_vertex_buffer, vtxbuf))
-{
-    struct nine_context *context = &device->context;
-    struct pipe_draw_info info;
-    struct pipe_draw_start_count draw;
-
-    nine_update_state(device);
-
-    init_draw_info(&info, &draw, device, PrimitiveType, PrimitiveCount);
-    info.index_size = 0;
-    draw.start = 0;
-    info.index_bias = 0;
-    info.min_index = 0;
-    info.max_index = draw.count - 1;
-    info.index.resource = NULL;
-
-    context->pipe->set_vertex_buffers(context->pipe, 0, 1, 0, false, vtxbuf);
-
-    context->pipe->draw_vbo(context->pipe, &info, NULL, &draw, 1);
-}
-
 CSMT_ITEM_NO_WAIT(nine_context_draw_indexed_primitive_from_vtxbuf_idxbuf,
                   ARG_VAL(D3DPRIMITIVETYPE, PrimitiveType),
                   ARG_VAL(UINT, MinVertexIndex),
@@ -2465,6 +2435,7 @@ CSMT_ITEM_NO_WAIT(nine_context_draw_indexed_primitive_from_vtxbuf_idxbuf,
         info.index.user = user_ibuf;
 
     context->pipe->set_vertex_buffers(context->pipe, 0, 1, 0, false, vbuf);
+    context->changed.vtxbuf |= 1;
 
     context->pipe->draw_vbo(context->pipe, &info, NULL, &draw, 1);
 }

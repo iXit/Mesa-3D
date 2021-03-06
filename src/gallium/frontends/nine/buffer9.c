@@ -143,6 +143,8 @@ NineBuffer9_ctor( struct NineBuffer9 *This,
         This->managed.dirty = TRUE;
         u_box_1d(0, Size, &This->managed.dirty_box);
         This->managed.discard_nooverwrite = false;
+        u_box_1d(0, 0, &This->managed.valid_region);
+        u_box_1d(0, 0, &This->managed.required_valid_region);
         list_inithead(&This->managed.list);
         list_inithead(&This->managed.list2);
         list_add(&This->managed.list2, &pParams->device->managed_buffers);

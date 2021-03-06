@@ -2912,14 +2912,60 @@ NineAfterDraw( struct NineDevice9 *This )
     }
 }
 
+#define IS_SYSTEMMEM_DYNAMIC(t) ((t) && (t)->base.pool == D3DPOOL_SYSTEMMEM && (t)->base.usage & D3DUSAGE_DYNAMIC)
+
+static void
+NineTrackSystemmemDynamic( struct NineBuffer9 *This, unsigned start, unsigned width )
+{
+    struct pipe_box box, box2;
+
+    u_box_1d(start, width, &box);
+    u_box_union_1d(&This->managed.required_valid_region,
+                   &This->managed.required_valid_region,
+                   &box);
+
+    if (!This->managed.dirty) {
+        u_box_union_1d(&box2,
+                       &This->managed.required_valid_region,
+                       &This->managed.valid_region);
+        if (This->managed.valid_region.x != box2.x ||
+            This->managed.valid_region.width != box2.width) {
+            This->managed.dirty = TRUE;
+            This->managed.dirty_box = box;
+            BASEBUF_REGISTER_UPDATE(This);
+        }
+    } else {
+        /* dirty_box.x == 0 triggers a discard which resets the required_valid_region to
+         * the dirty box */
+        if (This->managed.dirty_box.x == 0)
+            u_box_union_1d(&This->managed.dirty_box,
+                           &This->managed.dirty_box,
+                           &box);
+    }
+}
+
 HRESULT NINE_WINAPI
 NineDevice9_DrawPrimitive( struct NineDevice9 *This,
                            D3DPRIMITIVETYPE PrimitiveType,
                            UINT StartVertex,
                            UINT PrimitiveCount )
 {
+    unsigned i;
     DBG("iface %p, PrimitiveType %u, StartVertex %u, PrimitiveCount %u\n",
         This, PrimitiveType, StartVertex, PrimitiveCount);
+
+    /* Tracking for dynamic SYSTEMMEM */
+    for (i = 0; i < This->caps.MaxStreams; i++) {
+        unsigned stride = This->state.vtxbuf[i].stride;
+        if (IS_SYSTEMMEM_DYNAMIC((struct NineBuffer9*)This->state.stream[i])) {
+            unsigned start = StartVertex * stride;
+            unsigned full_size = This->state.stream[i]->base.size;
+            unsigned size = MIN2(full_size-start, PrimitiveCount * stride);
+            if (!stride) /* Instancing. Not sure what to do. Require all */
+                size = full_size;
+            NineTrackSystemmemDynamic(&This->state.stream[i]->base, start, size);
+        }
+    }
 
     NineBeforeDraw(This);
     nine_context_draw_primitive(This, PrimitiveType, StartVertex, PrimitiveCount);
@@ -2937,6 +2983,7 @@ NineDevice9_DrawIndexedPrimitive( struct NineDevice9 *This,
                                   UINT StartIndex,
                                   UINT PrimitiveCount )
 {
+    unsigned i;
     DBG("iface %p, PrimitiveType %u, BaseVertexIndex %u, MinVertexIndex %u "
         "NumVertices %u, StartIndex %u, PrimitiveCount %u\n",
         This, PrimitiveType, BaseVertexIndex, MinVertexIndex, NumVertices,
@@ -2944,6 +2991,18 @@ NineDevice9_DrawIndexedPrimitive( struct NineDevice9 *This,
 
     user_assert(This->state.idxbuf, D3DERR_INVALIDCALL);
     user_assert(This->state.vdecl, D3DERR_INVALIDCALL);
+
+    /* Tracking for dynamic SYSTEMMEM */
+    for (i = 0; i < This->caps.MaxStreams; i++) {
+        /* Set vertex buffers full dirty */
+        if (IS_SYSTEMMEM_DYNAMIC((struct NineBuffer9*)This->state.stream[i]))
+            NineTrackSystemmemDynamic(&This->state.stream[i]->base,
+                                      0, This->state.stream[i]->base.size);
+    }
+    if (IS_SYSTEMMEM_DYNAMIC(&This->state.idxbuf->base))
+        NineTrackSystemmemDynamic(&This->state.idxbuf->base,
+                                  StartIndex * This->state.idxbuf->index_size,
+                                  PrimitiveCount * This->state.idxbuf->index_size);
 
     NineBeforeDraw(This);
     nine_context_draw_indexed_primitive(This, PrimitiveType, BaseVertexIndex,

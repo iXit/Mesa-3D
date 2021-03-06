@@ -69,10 +69,14 @@ struct NineBuffer9
         struct pipe_box upload_pending_regions; /* region with uploads pending */
         struct list_head list; /* for update_buffers */
         struct list_head list2; /* for managed_buffers */
+        struct list_head list3; /* for attached_dynamic_systemmem_vertex_buffers */
         unsigned pending_upload; /* for uploads */
+        /* SYSTEMMEM DYNAMIC */
         bool discard_nooverwrite;
         bool discard_nooverwrite_noalign;
         unsigned nooverwrite_compatible_min_x;
+        struct pipe_box valid_region;
+        struct pipe_box required_valid_region;
     } managed;
 };
 static inline struct NineBuffer9 *
@@ -114,6 +118,7 @@ NineBuffer9_Upload( struct NineBuffer9 *This )
     int start = (This->managed.dirty_box.x/64)*64;
     int upload_size = MIN2(This->size, ((This->managed.dirty_box.x+This->managed.dirty_box.width+63)/64)*64) - start;
     unsigned upload_flags = 0;
+    struct pipe_box box;
 
     assert(This->base.pool != D3DPOOL_DEFAULT && This->managed.dirty);
 
@@ -123,10 +128,11 @@ NineBuffer9_Upload( struct NineBuffer9 *This )
          * buffer. For more efficient uploads, use DISCARD/NOOVERWRITE. */
         if (This->managed.dirty_box.x == 0) {
             upload_flags |= PIPE_MAP_DISCARD_WHOLE_RESOURCE;
-            /* TODO: Track region really needed to be uploaded. Until then
-             * we don't know which parts of the buffer are required to be correct.
-             * Thus fill everything. */
-            upload_size = This->size;
+            u_box_1d(0, 0, &This->managed.valid_region);
+            /* As we have discarded the resource, previous required valid regions
+             * can be flushed */
+            u_box_intersect_1d(&This->managed.required_valid_region,
+                               &This->managed.required_valid_region, &This->managed.dirty_box);
             This->managed.discard_nooverwrite = true;
             This->managed.discard_nooverwrite_noalign = false;
             This->managed.nooverwrite_compatible_min_x = This->managed.dirty_box.width;
@@ -140,6 +146,18 @@ NineBuffer9_Upload( struct NineBuffer9 *This )
         } else {
             /* One use incompatible with DISCARD/NOOVERWRITE. Disable until next discard */
             This->managed.discard_nooverwrite = false;
+        }
+        u_box_union_1d(&This->managed.valid_region, &This->managed.valid_region, &This->managed.dirty_box);
+        u_box_union_1d(&box, &This->managed.valid_region, &This->managed.required_valid_region);
+        /* If some required regions are missing, upload them too. */
+        if (box.x != This->managed.valid_region.x || box.width != This->managed.valid_region.width) {
+            unsigned stop = start + upload_size;
+            if (box.x != This->managed.valid_region.x)
+                start = box.x;
+            if ((box.x + box.width) < (This->managed.valid_region.x + This->managed.valid_region.width))
+                stop = box.x + box.width;
+            upload_size = stop - start;
+            This->managed.valid_region = box;
         }
     } else if (start == 0 && upload_size == This->size) {
         upload_flags |= PIPE_MAP_DISCARD_WHOLE_RESOURCE;

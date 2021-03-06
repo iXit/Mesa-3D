@@ -574,6 +574,7 @@ nine_context_range_upload(struct NineDevice9 *device,
                           struct pipe_resource *res,
                           unsigned offset,
                           unsigned size,
+                          unsigned usage,
                           const void *data);
 
 void

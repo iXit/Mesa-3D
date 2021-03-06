@@ -29,6 +29,7 @@
 #include "nine_state.h"
 #include "resource9.h"
 #include "pipe/p_context.h"
+#include "pipe/p_defines.h"
 #include "pipe/p_state.h"
 #include "util/list.h"
 #include "util/u_box.h"
@@ -69,6 +70,9 @@ struct NineBuffer9
         struct list_head list; /* for update_buffers */
         struct list_head list2; /* for managed_buffers */
         unsigned pending_upload; /* for uploads */
+        bool discard_nooverwrite;
+        bool discard_nooverwrite_noalign;
+        unsigned nooverwrite_compatible_min_x;
     } managed;
 };
 static inline struct NineBuffer9 *
@@ -109,8 +113,38 @@ NineBuffer9_Upload( struct NineBuffer9 *This )
     /* Align the upload with the cache line (for WC)*/
     int start = (This->managed.dirty_box.x/64)*64;
     int upload_size = MIN2(This->size, ((This->managed.dirty_box.x+This->managed.dirty_box.width+63)/64)*64) - start;
+    unsigned upload_flags = 0;
 
     assert(This->base.pool != D3DPOOL_DEFAULT && This->managed.dirty);
+
+    if (This->base.pool == D3DPOOL_SYSTEMMEM && This->base.usage & D3DUSAGE_DYNAMIC) {
+        /* D3DPOOL_SYSTEMMEM D3DUSAGE_DYNAMIC buffers tend to be updated frequently in a round fashion
+         * with no overlap for each lock (except obviously when coming back at the start of the
+         * buffer. For more efficient uploads, use DISCARD/NOOVERWRITE. */
+        if (This->managed.dirty_box.x == 0) {
+            upload_flags |= PIPE_MAP_DISCARD_WHOLE_RESOURCE;
+            /* TODO: Track region really needed to be uploaded. Until then
+             * we don't know which parts of the buffer are required to be correct.
+             * Thus fill everything. */
+            upload_size = This->size;
+            This->managed.discard_nooverwrite = true;
+            This->managed.discard_nooverwrite_noalign = false;
+            This->managed.nooverwrite_compatible_min_x = This->managed.dirty_box.width;
+        } else if (This->managed.discard_nooverwrite && This->managed.nooverwrite_compatible_min_x <= This->managed.dirty_box.x) {
+            upload_flags |= PIPE_MAP_UNSYNCHRONIZED;
+            This->managed.nooverwrite_compatible_min_x = This->managed.dirty_box.x+This->managed.dirty_box.width;
+            if (This->managed.discard_nooverwrite_noalign) {
+                start = This->managed.dirty_box.x;
+                upload_size = This->managed.dirty_box.width;
+            }
+        } else {
+            /* One use incompatible with DISCARD/NOOVERWRITE. Disable until next discard */
+            This->managed.discard_nooverwrite = false;
+        }
+    } else if (start == 0 && upload_size == This->size) {
+        upload_flags |= PIPE_MAP_DISCARD_WHOLE_RESOURCE;
+    }
+
     if (This->managed.pending_upload) {
         u_box_union_1d(&This->managed.upload_pending_regions,
                        &This->managed.upload_pending_regions,
@@ -123,6 +157,7 @@ NineBuffer9_Upload( struct NineBuffer9 *This )
                               This->base.resource,
                               start,
                               upload_size,
+                              upload_flags,
                               (char *)This->managed.data + start);
     This->managed.dirty = FALSE;
 }

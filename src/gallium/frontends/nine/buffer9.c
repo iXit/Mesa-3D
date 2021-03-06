@@ -87,7 +87,9 @@ NineBuffer9_ctor( struct NineBuffer9 *This,
      *   some small behavior differences between vendors). Implementing exactly as MANAGED should
      *   be fine.
      */
-    if (Pool != D3DPOOL_DEFAULT)
+    if (Pool == D3DPOOL_SYSTEMMEM && Usage & D3DUSAGE_DYNAMIC)
+        info->usage = PIPE_USAGE_STREAM;
+    else if (Pool != D3DPOOL_DEFAULT)
         info->usage = PIPE_USAGE_DEFAULT;
     else if (Usage & D3DUSAGE_DYNAMIC && Usage & D3DUSAGE_WRITEONLY)
         info->usage = PIPE_USAGE_STREAM;
@@ -140,6 +142,7 @@ NineBuffer9_ctor( struct NineBuffer9 *This,
         memset(This->managed.data, 0, Size);
         This->managed.dirty = TRUE;
         u_box_1d(0, Size, &This->managed.dirty_box);
+        This->managed.discard_nooverwrite = false;
         list_inithead(&This->managed.list);
         list_inithead(&This->managed.list2);
         list_add(&This->managed.list2, &pParams->device->managed_buffers);
@@ -264,6 +267,11 @@ NineBuffer9_Lock( struct NineBuffer9 *This,
              * MANAGED buffers are made dirty at Lock time */
             BASEBUF_REGISTER_UPDATE(This);
         }
+        /* SYSTEMMEM DYNAMIC: if the app is NOT passing NOOVERWRITE, something wrong is going on.
+         * As we upload 64b aligned data, previous data can be overwritten.
+         * Thus disable sending 64b aligned data until next discard */
+        if (!(Flags & D3DLOCK_NOOVERWRITE))
+            This->managed.discard_nooverwrite_noalign = true;
         *ppbData = (char *)This->managed.data + OffsetToLock;
         DBG("returning pointer %p\n", *ppbData);
         This->nlocks++;

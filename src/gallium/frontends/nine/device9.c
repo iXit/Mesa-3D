@@ -2974,6 +2974,39 @@ NineDevice9_DrawPrimitive( struct NineDevice9 *This,
     return D3D_OK;
 }
 
+static void index_systemmem_get_min_max( struct NineIndexBuffer9 *idxbuf,
+                                         UINT StartIndex,
+                                         UINT PrimitiveCount,
+                                         uint32_t *min,
+                                         uint32_t *max)
+{
+    unsigned i;
+    if (idxbuf->index_size == 2) {
+        uint16_t *buf = idxbuf->base.managed.data;
+        uint16_t min_index = 65535;
+        uint16_t max_index = 0;
+        for (i = StartIndex; i < MIN2(StartIndex+PrimitiveCount, idxbuf->base.size/2); i++) {
+            min_index = MIN2(min_index, buf[i]);
+            max_index = MAX2(max_index, buf[i]);
+        }
+        *min = (uint32_t)min_index;
+        *max = (uint32_t)max_index;
+        return;
+    } else if (idxbuf->index_size == 4) {
+        uint32_t *buf = idxbuf->base.managed.data;
+        uint32_t min_index = UINT_MAX;
+        uint32_t max_index = 0;
+        for (i = StartIndex; i < MIN2(StartIndex+PrimitiveCount, idxbuf->base.size/4); i++) {
+            min_index = MIN2(min_index, buf[i]);
+            max_index = MAX2(max_index, buf[i]);
+        }
+        *min = min_index;
+        *max = max_index;
+        return;
+    }
+    assert(false);
+}
+
 HRESULT NINE_WINAPI
 NineDevice9_DrawIndexedPrimitive( struct NineDevice9 *This,
                                   D3DPRIMITIVETYPE PrimitiveType,
@@ -2993,16 +3026,40 @@ NineDevice9_DrawIndexedPrimitive( struct NineDevice9 *This,
     user_assert(This->state.vdecl, D3DERR_INVALIDCALL);
 
     /* Tracking for dynamic SYSTEMMEM */
-    for (i = 0; i < This->caps.MaxStreams; i++) {
-        /* Set vertex buffers full dirty */
-        if (IS_SYSTEMMEM_DYNAMIC((struct NineBuffer9*)This->state.stream[i]))
-            NineTrackSystemmemDynamic(&This->state.stream[i]->base,
-                                      0, This->state.stream[i]->base.size);
-    }
     if (IS_SYSTEMMEM_DYNAMIC(&This->state.idxbuf->base))
         NineTrackSystemmemDynamic(&This->state.idxbuf->base,
                                   StartIndex * This->state.idxbuf->index_size,
                                   PrimitiveCount * This->state.idxbuf->index_size);
+
+    for (i = 0; i < This->caps.MaxStreams; i++) {
+        /* Set vertex buffers full dirty. Check indices if readable directly */
+        if (IS_SYSTEMMEM_DYNAMIC((struct NineBuffer9*)This->state.stream[i])) {
+            uint32_t stride = This->state.vtxbuf[i].stride;
+            uint32_t full_size = This->state.stream[i]->base.size;
+            uint32_t start, stop, min, max;
+            if (This->state.idxbuf->base.managed.data) {
+                index_systemmem_get_min_max(This->state.idxbuf, StartIndex, PrimitiveCount, &min, &max);
+                DBG("Computed min/max of index buffer: %d %d\n", (int)min, (int)max);
+                min += BaseVertexIndex;
+                max += BaseVertexIndex;
+                if (min > max) /* underflow of min. Let's assume max won't overflow. */
+                    min = 0;
+            } else {
+                min = 0;
+                max = full_size-1;
+            }
+            start = min * stride;
+            stop = (max+1) * stride;
+            if (stride == 0) {
+                start = 0;
+                stop = full_size;
+            }
+            stop = MIN2(stop, full_size);
+
+            NineTrackSystemmemDynamic(&This->state.stream[i]->base,
+                                      start, stop-start);
+        }
+    }
 
     NineBeforeDraw(This);
     nine_context_draw_indexed_primitive(This, PrimitiveType, BaseVertexIndex,

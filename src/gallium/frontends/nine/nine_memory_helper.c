@@ -109,7 +109,8 @@
 
 #define DBG_CHANNEL (DBG_BASETEXTURE|DBG_SURFACE|DBG_VOLUME|DBG_TEXTURE|DBG_CUBETEXTURE)
 
-#ifdef PIPE_ARCH_X86 /* Use memfd only for 32 bits */
+/* Use memfd only for 32 bits. Check for memfd_create support */
+#if defined(PIPE_ARCH_X86) && defined(MFD_HUGETLB)
 #define NINE_ENABLE_MEMFD
 #endif
 

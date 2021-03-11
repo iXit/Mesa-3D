@@ -249,6 +249,8 @@ NineDevice9_ctor( struct NineDevice9 *This,
      * still succeeds when texture allocation fails. */
     This->available_texture_limit = This->available_texture_mem * 5LL / 100LL;
 
+    This->frame_count = 0; /* Used to check if events occur the same frame */
+
     /* create implicit swapchains */
     This->nswapchains = ID3DPresentGroup_GetMultiheadCount(This->present);
     This->swapchains = CALLOC(This->nswapchains,
@@ -2920,28 +2922,12 @@ NineTrackSystemmemDynamic( struct NineBuffer9 *This, unsigned start, unsigned wi
     struct pipe_box box, box2;
 
     u_box_1d(start, width, &box);
+    This->managed.required_valid_region = box;
     u_box_union_1d(&This->managed.required_valid_region,
                    &This->managed.required_valid_region,
                    &box);
-
-    if (!This->managed.dirty) {
-        u_box_union_1d(&box2,
-                       &This->managed.required_valid_region,
-                       &This->managed.valid_region);
-        if (This->managed.valid_region.x != box2.x ||
-            This->managed.valid_region.width != box2.width) {
-            This->managed.dirty = TRUE;
-            This->managed.dirty_box = box;
-            BASEBUF_REGISTER_UPDATE(This);
-        }
-    } else {
-        /* dirty_box.x == 0 triggers a discard which resets the required_valid_region to
-         * the dirty box */
-        if (This->managed.dirty_box.x == 0)
-            u_box_union_1d(&This->managed.dirty_box,
-                           &This->managed.dirty_box,
-                           &box);
-    }
+    This->managed.dirty = TRUE;
+    BASEBUF_REGISTER_UPDATE(This);
 }
 
 HRESULT NINE_WINAPI

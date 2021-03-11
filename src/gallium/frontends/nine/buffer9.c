@@ -142,9 +142,10 @@ NineBuffer9_ctor( struct NineBuffer9 *This,
         memset(This->managed.data, 0, Size);
         This->managed.dirty = TRUE;
         u_box_1d(0, Size, &This->managed.dirty_box);
-        This->managed.discard_nooverwrite = false;
         u_box_1d(0, 0, &This->managed.valid_region);
         u_box_1d(0, 0, &This->managed.required_valid_region);
+        u_box_1d(0, 0, &This->managed.filled_region);
+        This->managed.can_unsynchronized = true;
         list_inithead(&This->managed.list);
         list_inithead(&This->managed.list2);
         list_add(&This->managed.list2, &pParams->device->managed_buffers);
@@ -250,30 +251,50 @@ NineBuffer9_Lock( struct NineBuffer9 *This,
     u_box_1d(OffsetToLock, SizeToLock, &box);
 
     if (This->base.pool != D3DPOOL_DEFAULT) {
-        /* READONLY doesn't dirty the buffer */
-        /* Tests on Win: READONLY doesn't wait for the upload */
-        if (!(Flags & D3DLOCK_READONLY)) {
-            if (!This->managed.dirty) {
-                assert(list_is_empty(&This->managed.list));
-                This->managed.dirty = TRUE;
-                This->managed.dirty_box = box;
-                /* Flush if regions pending to be uploaded would be dirtied */
-                if (p_atomic_read(&This->managed.pending_upload)) {
-                    u_box_intersect_1d(&box, &box, &This->managed.upload_pending_regions);
-                    if (box.width != 0)
-                        nine_csmt_process(This->base.base.device);
-                }
-            } else
-                u_box_union_1d(&This->managed.dirty_box, &This->managed.dirty_box, &box);
-            /* Tests trying to draw while the buffer is locked show that
-             * MANAGED buffers are made dirty at Lock time */
+        /* MANAGED: READONLY doesn't dirty the buffer, nor
+         * wait the upload in the worker thread
+         * SYSTEMMEM: AMD/NVidia: All locks dirty the full buffer. Not on Intel
+         * For Nvidia, SYSTEMMEM behaves are if there is no worker thread.
+         * On AMD, READONLY and NOOVERWRITE do dirty the buffer, but do not sync the previous uploads
+         * in the worker thread. On Intel only NOOVERWRITE has that effect.
+         * We implement the AMD behaviour. */
+        if (This->base.pool == D3DPOOL_MANAGED) {
+            if (!(Flags & D3DLOCK_READONLY)) {
+                if (!This->managed.dirty) {
+                    assert(list_is_empty(&This->managed.list));
+                    This->managed.dirty = TRUE;
+                    This->managed.dirty_box = box;
+                    /* Flush if regions pending to be uploaded would be dirtied */
+                    if (p_atomic_read(&This->managed.pending_upload)) {
+                        u_box_intersect_1d(&box, &box, &This->managed.upload_pending_regions);
+                        if (box.width != 0)
+                            nine_csmt_process(This->base.base.device);
+                    }
+                } else
+                    u_box_union_1d(&This->managed.dirty_box, &This->managed.dirty_box, &box);
+                /* Tests trying to draw while the buffer is locked show that
+                 * SYSTEMMEM/MANAGED buffers are made dirty at Lock time */
+                BASEBUF_REGISTER_UPDATE(This);
+            }
+        } else {
+            if (!(Flags & (D3DLOCK_READONLY|D3DLOCK_NOOVERWRITE)) &&
+                p_atomic_read(&This->managed.pending_upload)) {
+                nine_csmt_process(This->base.base.device);
+                /* Note: AS DISCARD is not relevant for SYSTEMMEM,
+                 * NOOVERWRITE might have a similar meaning as what is
+                 * in D3D7 doc. Basically that data from previous draws
+                 * OF THIS FRAME are unaffected. As we flush csmt in Present(),
+                 * we should be correct. In some parts of the doc, the notion
+                 * of frame is implied to be related to Begin/EndScene(),
+                 * but tests show NOOVERWRITE after EndScene() doesn't flush
+                 * the csmt thread. */
+            }
+            This->managed.dirty = true;
+            u_box_1d(0, This->size, &This->managed.dirty_box); /* systemmem non-dynamic */
+            u_box_1d(0, 0, &This->managed.valid_region); /* systemmem dynamic */
             BASEBUF_REGISTER_UPDATE(This);
         }
-        /* SYSTEMMEM DYNAMIC: if the app is NOT passing NOOVERWRITE, something wrong is going on.
-         * As we upload 64b aligned data, previous data can be overwritten.
-         * Thus disable sending 64b aligned data until next discard */
-        if (!(Flags & D3DLOCK_NOOVERWRITE))
-            This->managed.discard_nooverwrite_noalign = true;
+
         *ppbData = (char *)This->managed.data + OffsetToLock;
         DBG("returning pointer %p\n", *ppbData);
         This->nlocks++;

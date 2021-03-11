@@ -163,6 +163,8 @@ struct NineDevice9
     boolean swvp;
     /* pure device */
     boolean pure;
+
+    unsigned frame_count; /* It's ok if we overflow */
 };
 static inline struct NineDevice9 *
 NineDevice9( void *data )

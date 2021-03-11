@@ -154,8 +154,10 @@ NineBuffer9_Upload( struct NineBuffer9 *This )
                            required_valid_region);
         /* If the required valid region is already valid, nothing to do */
         if (region_already_valid.x == required_valid_region->x &&
-            region_already_valid.width == required_valid_region->width)
+            region_already_valid.width == required_valid_region->width) {
+            u_box_1d(0, 0, required_valid_region);
             return;
+        }
         /* (Try to) Remove valid areas from the region to upload */
         u_box_try_remove_region_1d(&box_upload,
                                    required_valid_region,
@@ -220,6 +222,7 @@ NineBuffer9_Upload( struct NineBuffer9 *This )
         u_box_union_1d(valid_region,
                        valid_region,
                        &box_upload);
+        u_box_1d(0, 0, required_valid_region);
         start = box_upload.x;
         upload_size = box_upload.width;
     } else {

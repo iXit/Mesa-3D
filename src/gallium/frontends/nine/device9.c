@@ -2922,7 +2922,6 @@ NineTrackSystemmemDynamic( struct NineBuffer9 *This, unsigned start, unsigned wi
     struct pipe_box box, box2;
 
     u_box_1d(start, width, &box);
-    This->managed.required_valid_region = box;
     u_box_union_1d(&This->managed.required_valid_region,
                    &This->managed.required_valid_region,
                    &box);

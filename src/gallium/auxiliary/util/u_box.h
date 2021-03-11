@@ -119,17 +119,26 @@ u_box_volume_3d(const struct pipe_box *box)
    return (int64_t)box->width * box->height * box->depth;
 }
 
-/* Aliasing of @dst permitted. */
+/* Aliasing of @dst permitted. Supports empty width */
 static inline void
 u_box_union_1d(struct pipe_box *dst,
                const struct pipe_box *a, const struct pipe_box *b)
 {
-   int x;
+   int x, width;
 
-   x = MIN2(a->x, b->x);
+   if (a->width == 0) {
+       x = b->x;
+       width = b->width;
+   } else if (b->width == 0) {
+       x = a->x;
+       width = a->width;
+   } else {
+       x = MIN2(a->x, b->x);
+       width = MAX2(a->x + a->width, b->x + b->width) - x;
+   }
 
-   dst->width = MAX2(a->x + a->width, b->x + b->width) - x;
    dst->x = x;
+   dst->width = width;
 }
 
 /* Aliasing of @dst permitted. */

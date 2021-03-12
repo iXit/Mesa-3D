@@ -70,6 +70,25 @@ NineBuffer9_ctor( struct NineBuffer9 *This,
      * can still be read (but slower). */
     info->bind = (Type == D3DRTYPE_INDEXBUFFER) ? PIPE_BIND_INDEX_BUFFER : PIPE_BIND_VERTEX_BUFFER;
 
+    /* Software vertex processing:
+     * If the device is full software vertex processing,
+     * then the buffer is supposed to be used only for sw processing.
+     * For mixed vertex processing, buffers with D3DUSAGE_SOFTWAREPROCESSING
+     * can be used for both sw and hw processing.
+     * These buffers are expected to be stored in RAM.
+     * Apps expect locking the full buffer with no flags, then
+     * render a a few primitive, then locking again, etc
+     * to be a fast pattern. Only the SYSTEMMEM DYNAMIC path
+     * will give that pattern ok performance in our case.
+     * An alternative would be when sw processing is detected to
+     * convert Draw* calls to Draw*Up calls. */
+    if (Usage & D3DUSAGE_SOFTWAREPROCESSING ||
+        pParams->device->params.BehaviorFlags & D3DCREATE_SOFTWARE_VERTEXPROCESSING) {
+        Pool = D3DPOOL_SYSTEMMEM;
+        Usage |= D3DUSAGE_DYNAMIC;
+        /* Note: the application cannot retrieve Pool and Usage */
+    }
+
     /* It is hard to find clear information on where to place the buffer in
      * memory depending on the flag.
      * MSDN: resources are static, except for those with DYNAMIC, thus why you
@@ -114,10 +133,6 @@ NineBuffer9_ctor( struct NineBuffer9 *This,
     /* if (pDesc->Usage & D3DUSAGE_NPATCHES) { } */
     /* if (pDesc->Usage & D3DUSAGE_POINTS) { } */
     /* if (pDesc->Usage & D3DUSAGE_RTPATCHES) { } */
-    /* The buffer must be usable with both sw and hw
-     * vertex processing. It is expected to be slower with hw. */
-    if (Usage & D3DUSAGE_SOFTWAREPROCESSING)
-        info->usage = PIPE_USAGE_STAGING;
     /* if (pDesc->Usage & D3DUSAGE_TEXTAPI) { } */
 
     info->height0 = 1;

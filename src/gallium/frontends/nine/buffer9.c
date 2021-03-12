@@ -89,6 +89,16 @@ NineBuffer9_ctor( struct NineBuffer9 *This,
         /* Note: the application cannot retrieve Pool and Usage */
     }
 
+    /* Always use the DYNAMIC path for SYSTEMMEM.
+     * If the app uses the vertex buffer is a dynamic fashion,
+     * this is going to be very significantly faster that way.
+     * If the app uses the vertex buffer in a static fashion,
+     * instead of being filled all at once, the buffer will be filled
+     * little per little, until it is fully filled, thus the perf hit
+     * will be very small. */
+    if (Pool == D3DPOOL_SYSTEMMEM)
+        Usage |= D3DUSAGE_DYNAMIC;
+
     /* It is hard to find clear information on where to place the buffer in
      * memory depending on the flag.
      * MSDN: resources are static, except for those with DYNAMIC, thus why you
